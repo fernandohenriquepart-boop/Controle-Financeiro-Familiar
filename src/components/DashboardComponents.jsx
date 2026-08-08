@@ -1,6 +1,8 @@
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, AlertTriangle, Pencil, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
-import { Card, EmptyState, Badge } from "./ui";
+import { Card, Modal, EmptyState, Badge } from "./ui";
+import { TransactionModal } from "./TransactionModal";
 import {
   formatCurrency,
   formatMonthLabel,
@@ -11,13 +13,14 @@ import {
   colorPreset,
   upcomingBills,
   isOverdue,
+  buildEditPayload,
 } from "../domain";
 
 const CHART_COLORS = ["#059669", "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#d97706", "#64748b"];
 
-function SummaryCard({ icon: Icon, label, value, tone, subtitle }) {
-  return (
-    <Card className="flex items-center gap-3">
+function SummaryCard({ icon: Icon, label, value, tone, subtitle, onClick }) {
+  const content = (
+    <>
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone}`}>
         <Icon size={18} />
       </div>
@@ -26,7 +29,89 @@ function SummaryCard({ icon: Icon, label, value, tone, subtitle }) {
         <p className="truncate text-lg font-semibold text-slate-900">{value}</p>
         {subtitle && <p className="truncate text-[11px] text-slate-400">{subtitle}</p>}
       </div>
-    </Card>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="text-left">
+        <Card className="flex items-center gap-3 transition-shadow hover:shadow-md">{content}</Card>
+      </button>
+    );
+  }
+
+  return <Card className="flex items-center gap-3">{content}</Card>;
+}
+
+function MonthExpensesModal({ isOpen, onClose, transactions, categories, accounts, monthLabel, total, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(null);
+  const sorted = [...transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  async function handleEditSubmit(form) {
+    const { __id, ...payload } = form;
+    await onUpdate(__id, payload);
+  }
+
+  return (
+    <Modal title={`Despesas de ${monthLabel}`} isOpen={isOpen} onClose={onClose} wide>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-slate-600">
+          Total: <span className="font-semibold text-rose-600">{formatCurrency(total)}</span>
+        </p>
+
+        {sorted.length === 0 ? (
+          <EmptyState title="Nenhuma despesa neste mês" />
+        ) : (
+          <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+            {sorted.map((t) => {
+              const category = categories.find((c) => c.id === t.categoryId);
+              const account = accounts.find((a) => a.id === t.accountId);
+              const preset = colorPreset(category?.colorId);
+              return (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${preset.dot}`} />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-slate-800">{t.description || category?.name || "Lançamento"}</p>
+                      <p className="truncate text-xs text-slate-400">
+                        {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                        {category ? ` · ${category.name}` : ""}
+                        {account ? ` · ${account.name}` : ""}
+                        {t.isFixed ? " · fixa" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-medium text-rose-600">{formatCurrency(t.amount)}</span>
+                    <button
+                      onClick={() => setEditing(buildEditPayload(t))}
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(t.id)}
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <TransactionModal
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        onSubmit={handleEditSubmit}
+        categories={categories}
+        accounts={accounts}
+        initial={editing}
+      />
+    </Modal>
   );
 }
 
@@ -52,7 +137,8 @@ export function MonthSwitcher({ monthKey, onChange }) {
   );
 }
 
-export function DashboardTab({ accounts, transactions, categories, bills, monthKey }) {
+export function DashboardTab({ accounts, transactions, categories, bills, monthKey, onUpdate, onDelete }) {
+  const [expensesModalOpen, setExpensesModalOpen] = useState(false);
   const monthTx = transactionsInMonth(transactions, monthKey);
   const income = sumByType(monthTx, "income");
   const expense = sumByType(monthTx, "expense");
@@ -79,6 +165,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           value={formatCurrency(expense)}
           tone="bg-rose-50 text-rose-600"
           subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)}`}
+          onClick={() => setExpensesModalOpen(true)}
         />
       </div>
 
@@ -165,6 +252,18 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           </ul>
         )}
       </Card>
+
+      <MonthExpensesModal
+        isOpen={expensesModalOpen}
+        onClose={() => setExpensesModalOpen(false)}
+        transactions={monthTx.filter((t) => t.type === "expense")}
+        categories={categories}
+        accounts={accounts}
+        monthLabel={formatMonthLabel(monthKey)}
+        total={expense}
+        onUpdate={onUpdate}
+        onDelete={onDelete}
+      />
     </div>
   );
 }

@@ -441,7 +441,15 @@ export default function App() {
 
         <div className="flex-1 overflow-y-auto p-4">
           {tab === "dashboard" ? (
-            <DashboardTab accounts={accounts} transactions={transactions} categories={categories} bills={bills} monthKey={monthKey} />
+            <DashboardTab
+              accounts={accounts}
+              transactions={transactions}
+              categories={categories}
+              bills={bills}
+              monthKey={monthKey}
+              onUpdate={editTransaction}
+              onDelete={removeTransaction}
+            />
           ) : tab === "transactions" ? (
             <TransactionsTab
               transactions={transactions}
