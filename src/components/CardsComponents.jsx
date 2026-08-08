@@ -512,6 +512,8 @@ export function CardsTab({
 
   return (
     <div className="flex flex-col gap-4">
+      <CardsMonthlyChart accounts={accounts} transactions={transactions} />
+
       <div className="flex flex-wrap justify-end gap-2">
         <button
           onClick={() => setImportOpen(true)}
@@ -569,8 +571,6 @@ export function CardsTab({
           </ul>
         )}
       </Card>
-
-      <CardsMonthlyChart accounts={accounts} transactions={transactions} />
 
       <NewPurchaseModal
         isOpen={modalOpen}
