@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { LayoutDashboard, Receipt, PieChart, CalendarClock, Target, Settings, X } from "lucide-react";
+import { LayoutDashboard, Receipt, PieChart, CalendarClock, Target, Settings, CreditCard, X } from "lucide-react";
 import { currentMonthKey, shiftMonthKey } from "./domain";
 import { getSession, onAuthStateChange, fetchProfile, signOut, inviteMember as inviteMemberApi } from "./services/auth";
 import * as householdsApi from "./services/households";
@@ -9,6 +9,7 @@ import * as transactionsApi from "./services/transactions";
 import * as budgetsApi from "./services/budgets";
 import * as billsApi from "./services/bills";
 import * as goalsApi from "./services/goals";
+import * as recurringSeriesApi from "./services/recurringSeries";
 import { LoginScreen } from "./components/AuthComponents";
 import { DesktopSidebar, MobileTopBar, MobileNavDrawer } from "./components/Navigation";
 import { DashboardTab, MonthSwitcher } from "./components/DashboardComponents";
@@ -16,11 +17,13 @@ import { TransactionsTab } from "./components/TransactionsComponents";
 import { BudgetsTab } from "./components/BudgetsComponents";
 import { BillsTab } from "./components/BillsComponents";
 import { GoalsTab } from "./components/GoalsComponents";
+import { CardsTab } from "./components/CardsComponents";
 import { SettingsTab } from "./components/SettingsComponents";
 
 const TABS = [
   { id: "dashboard", label: "Painel", icon: LayoutDashboard },
   { id: "transactions", label: "Lançamentos", icon: Receipt },
+  { id: "cards", label: "Lançamentos Cartões", icon: CreditCard },
   { id: "budgets", label: "Orçamentos", icon: PieChart },
   { id: "bills", label: "Contas", icon: CalendarClock },
   { id: "goals", label: "Metas", icon: Target },
@@ -76,6 +79,7 @@ export default function App() {
   const [bills, setBills] = useState([]);
   const [goals, setGoals] = useState([]);
   const [budgets, setBudgets] = useState([]);
+  const [series, setSeries] = useState([]);
   const [isHydrated, setIsHydrated] = useState(false);
   const [syncError, setSyncError] = useState(null);
 
@@ -94,7 +98,7 @@ export default function App() {
     let cancelled = false;
     async function load() {
       try {
-        const [householdData, membersData, accountsData, categoriesData, transactionsData, billsData, goalsData] =
+        const [householdData, membersData, accountsData, categoriesData, transactionsData, billsData, goalsData, seriesData] =
           await Promise.all([
             householdsApi.fetchHousehold(profile.household_id),
             householdsApi.fetchMembers(profile.household_id),
@@ -103,6 +107,7 @@ export default function App() {
             transactionsApi.fetchTransactions(profile.household_id),
             billsApi.fetchBills(profile.household_id),
             goalsApi.fetchGoals(profile.household_id),
+            recurringSeriesApi.fetchSeries(profile.household_id),
           ]);
         if (cancelled) return;
         setHousehold(householdData);
@@ -112,6 +117,19 @@ export default function App() {
         setTransactions(transactionsData);
         setBills(billsData);
         setGoals(goalsData);
+        setSeries(seriesData);
+
+        // Completa recorrências "sem fim" que estejam ficando sem meses futuros
+        // gerados, então recarrega só o que pode ter mudado.
+        await recurringSeriesApi.extendIndefiniteSeries(profile.household_id);
+        if (cancelled) return;
+        const [refreshedTransactions, refreshedSeries] = await Promise.all([
+          transactionsApi.fetchTransactions(profile.household_id),
+          recurringSeriesApi.fetchSeries(profile.household_id),
+        ]);
+        if (cancelled) return;
+        setTransactions(refreshedTransactions);
+        setSeries(refreshedSeries);
       } catch (err) {
         if (!cancelled) flashSyncError(err);
       } finally {
@@ -160,6 +178,50 @@ export default function App() {
     try {
       await transactionsApi.deleteTransaction(id);
       setTransactions((prev) => prev.filter((t) => t.id !== id));
+    } catch (err) {
+      flashSyncError(err);
+    }
+  }
+
+  async function refreshTransactionsAndSeries() {
+    const [t, s] = await Promise.all([
+      transactionsApi.fetchTransactions(profile.household_id),
+      recurringSeriesApi.fetchSeries(profile.household_id),
+    ]);
+    setTransactions(t);
+    setSeries(s);
+  }
+
+  async function createRecurringTransaction(draft, months) {
+    try {
+      await recurringSeriesApi.createRecurringTransaction(
+        { ...draft, startDate: draft.date, count: months },
+        profile.household_id
+      );
+      await refreshTransactionsAndSeries();
+    } catch (err) {
+      flashSyncError(err);
+    }
+  }
+
+  // --- Lançamentos Cartões -----------------------------------------------
+  async function createCardPurchase(draft) {
+    try {
+      const account = accounts.find((a) => a.id === draft.accountId);
+      await recurringSeriesApi.createInstallmentPurchase(
+        { ...draft, dueDay: account?.dueDay ?? new Date(draft.purchaseDate).getDate() },
+        profile.household_id
+      );
+      await refreshTransactionsAndSeries();
+    } catch (err) {
+      flashSyncError(err);
+    }
+  }
+  async function removeSeries(id) {
+    try {
+      await recurringSeriesApi.deleteSeries(id);
+      setSeries((prev) => prev.filter((s) => s.id !== id));
+      setTransactions((prev) => prev.filter((t) => t.seriesId !== id));
     } catch (err) {
       flashSyncError(err);
     }
@@ -371,8 +433,18 @@ export default function App() {
               accounts={accounts}
               monthKey={monthKey}
               onCreate={createTransaction}
+              onCreateRecurring={createRecurringTransaction}
               onUpdate={editTransaction}
               onDelete={removeTransaction}
+            />
+          ) : tab === "cards" ? (
+            <CardsTab
+              accounts={accounts}
+              transactions={transactions}
+              categories={categories}
+              series={series}
+              onCreatePurchase={createCardPurchase}
+              onDeleteSeries={removeSeries}
             />
           ) : tab === "budgets" ? (
             <BudgetsTab categories={categories} budgets={budgets} transactions={transactions} monthKey={monthKey} onSetBudget={setBudget} />

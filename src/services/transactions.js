@@ -12,6 +12,7 @@ function mapFromDb(row) {
     isRecurring: row.is_recurring,
     recurrenceRule: row.recurrence_rule ?? undefined,
     createdBy: row.created_by ?? undefined,
+    seriesId: row.series_id ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -29,6 +30,7 @@ function mapToDb(transaction, householdId) {
     is_recurring: transaction.isRecurring ?? false,
     recurrence_rule: transaction.recurrenceRule || null,
     created_by: transaction.createdBy || null,
+    series_id: transaction.seriesId || null,
   };
 }
 
@@ -49,6 +51,15 @@ export async function insertTransaction(transaction, householdId) {
     .single();
   if (error) throw error;
   return mapFromDb(data);
+}
+
+export async function insertTransactionsBulk(transactions, householdId) {
+  const { data, error } = await supabase
+    .from("transactions")
+    .insert(transactions.map((t) => mapToDb(t, householdId)))
+    .select();
+  if (error) throw error;
+  return data.map(mapFromDb);
 }
 
 export async function updateTransaction(id, changes) {

@@ -17,11 +17,18 @@ function emptyForm(type = "expense") {
 
 function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, initial }) {
   const [form, setForm] = useState(initial ?? emptyForm());
+  const [repeats, setRepeats] = useState(false);
+  const [repeatMonths, setRepeatMonths] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isEditing = Boolean(initial?.__id);
 
   useMemo(() => {
-    if (isOpen) setForm(initial ?? emptyForm());
+    if (isOpen) {
+      setForm(initial ?? emptyForm());
+      setRepeats(false);
+      setRepeatMonths("");
+    }
   }, [isOpen, initial]);
 
   const filteredCategories = categories.filter((c) => c.type === form.type);
@@ -35,7 +42,8 @@ function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, ini
     }
     setIsSubmitting(true);
     try {
-      await onSubmit({ ...form, amount: Number(form.amount) });
+      const recurring = !isEditing && repeats ? { months: repeatMonths ? Number(repeatMonths) : null } : null;
+      await onSubmit({ ...form, amount: Number(form.amount) }, recurring);
       onClose();
     } catch (err) {
       setError(err.message || "Não foi possível salvar.");
@@ -147,6 +155,34 @@ function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, ini
           </select>
         </Field>
 
+        {!isEditing && (
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={repeats}
+                onChange={(e) => setRepeats(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              Repete nos próximos meses?
+            </label>
+            {repeats && (
+              <Field label="Por quantos meses? (deixe em branco para sem fim)">
+                <input
+                  type="number"
+                  min="2"
+                  max="240"
+                  step="1"
+                  value={repeatMonths}
+                  onChange={(e) => setRepeatMonths(e.target.value)}
+                  className={`${inputClass} w-full`}
+                  placeholder="Sem fim"
+                />
+              </Field>
+            )}
+          </div>
+        )}
+
         {error && <p className="text-xs text-rose-600">{error}</p>}
 
         <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
@@ -157,7 +193,7 @@ function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, ini
   );
 }
 
-export function TransactionsTab({ transactions, categories, accounts, monthKey, onCreate, onUpdate, onDelete }) {
+export function TransactionsTab({ transactions, categories, accounts, monthKey, onCreate, onCreateRecurring, onUpdate, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
 
@@ -181,10 +217,12 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
     setModalOpen(true);
   }
 
-  async function handleSubmit(form) {
+  async function handleSubmit(form, recurring) {
     const { __id, __new, ...payload } = form;
     if (__id) {
       await onUpdate(__id, payload);
+    } else if (recurring) {
+      await onCreateRecurring(payload, recurring.months);
     } else {
       await onCreate(payload);
     }
