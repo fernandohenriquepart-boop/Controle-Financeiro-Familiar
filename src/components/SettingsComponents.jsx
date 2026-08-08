@@ -295,6 +295,10 @@ function AccountModal({ isOpen, onClose, onSubmit, initial }) {
       setError("Informe um nome.");
       return;
     }
+    if (form.type === "cartao_credito" && (!form.closingDay || !form.dueDay)) {
+      setError("Informe o dia de fechamento e o dia de vencimento do cartão.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await onSubmit({
@@ -356,6 +360,7 @@ function AccountModal({ isOpen, onClose, onSubmit, initial }) {
             <Field label="Fecha dia">
               <input
                 type="number"
+                required
                 min="1"
                 max="31"
                 value={form.closingDay}
@@ -366,6 +371,7 @@ function AccountModal({ isOpen, onClose, onSubmit, initial }) {
             <Field label="Vence dia">
               <input
                 type="number"
+                required
                 min="1"
                 max="31"
                 value={form.dueDay}

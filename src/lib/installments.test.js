@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { nextDueDate, monthlyDates, splitAmount, buildInstallmentSchedule, buildRecurringSchedule } from "./installments.js";
+import { nextDueDate, monthlyDates, splitAmount, billingDueDate, buildInstallmentSchedule, buildRecurringSchedule } from "./installments.js";
 
 function iso(date) {
   return date.toISOString().slice(0, 10);
@@ -38,9 +38,21 @@ test("splitAmount: última parcela absorve o resto do arredondamento e a soma ba
   assert.equal(Math.round(parts.reduce((a, b) => a + b, 0) * 100), 10000);
 });
 
-test("buildInstallmentSchedule: compra parcelada agenda a partir do próximo vencimento do cartão", () => {
+test("billingDueDate: compra no meio do ciclo (antes do fechamento) cai no vencimento seguinte", () => {
+  // fecha dia 25, vence dia 10; compra em 15/mar, ainda antes do fechamento de março
+  assert.equal(iso(billingDueDate(new Date(2026, 2, 15), 25, 10)), "2026-04-10");
+});
+test("billingDueDate: compra logo depois do fechamento pula uma fatura inteira", () => {
+  // fecha dia 25, vence dia 10; compra em 27/mar, já depois do fechamento de março
+  // uma lógica que olhasse só o vencimento diria 10/abr — mas essa compra só entra
+  // na fatura seguinte, vencendo 10/mai.
+  assert.equal(iso(billingDueDate(new Date(2026, 2, 27), 25, 10)), "2026-05-10");
+});
+
+test("buildInstallmentSchedule: compra parcelada agenda a partir da fatura efetiva da compra", () => {
   const schedule = buildInstallmentSchedule({
-    purchaseDate: new Date(2026, 2, 15), // 15/mar, cartão vence dia 10
+    purchaseDate: new Date(2026, 2, 15), // 15/mar — fecha dia 25, vence dia 10
+    closingDay: 25,
     dueDay: 10,
     count: 3,
     totalAmount: 300,

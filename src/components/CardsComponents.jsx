@@ -5,6 +5,7 @@ import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, seconda
 import { ImportFaturaModal } from "./ImportFaturaModal";
 import { MonthSwitcher } from "./DashboardComponents";
 import { TransactionModal } from "./TransactionModal";
+import { billingDueDate } from "../lib/installments";
 import {
   formatCurrency,
   formatMonthLabel,
@@ -13,6 +14,7 @@ import {
   currentMonthKey,
   shiftMonthKey,
   buildEditPayload,
+  toDateInputValue,
 } from "../domain";
 
 const CARD_CHART_COLORS = ["#7c3aed", "#0891b2", "#db2777", "#059669", "#d97706", "#dc2626", "#2563eb", "#65a30d"];
@@ -142,6 +144,147 @@ function NewPurchaseModal({ isOpen, onClose, onSubmit, cardAccounts, categories 
             />
           </Field>
         </div>
+
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
+          {isSubmitting ? "Salvando..." : "Salvar"}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
+function emptyCashForm(accounts) {
+  return {
+    accountId: accounts[0]?.id ?? "",
+    description: "",
+    amount: "",
+    categoryId: "",
+    purchaseDate: new Date().toISOString().slice(0, 10),
+  };
+}
+
+function NewCashPurchaseModal({ isOpen, onClose, onSubmit, cardAccounts, categories }) {
+  const [form, setForm] = useState(emptyCashForm(cardAccounts));
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useMemo(() => {
+    if (isOpen) setForm(emptyCashForm(cardAccounts));
+  }, [isOpen, cardAccounts]);
+
+  const expenseCategories = categories.filter((c) => c.type === "expense");
+  const account = cardAccounts.find((a) => a.id === form.accountId);
+  const billingDate =
+    account?.closingDay && account?.dueDay
+      ? billingDueDate(new Date(form.purchaseDate + "T00:00:00"), account.closingDay, account.dueDay)
+      : null;
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    if (!form.accountId) {
+      setError("Cadastre um cartão em Configurações primeiro.");
+      return;
+    }
+    if (!form.amount || Number(form.amount) <= 0) {
+      setError("Informe um valor maior que zero.");
+      return;
+    }
+    if (!billingDate) {
+      setError("Esse cartão está sem dia de fechamento/vencimento cadastrado.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        type: "expense",
+        accountId: form.accountId,
+        categoryId: form.categoryId,
+        description: form.description,
+        amount: Number(form.amount),
+        date: toDateInputValue(billingDate),
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || "Não foi possível salvar.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title="Compra à vista no cartão" isOpen={isOpen} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <Field label="Cartão">
+          <select
+            value={form.accountId}
+            onChange={(e) => setForm((f) => ({ ...f, accountId: e.target.value }))}
+            className={`${inputClass} w-full`}
+          >
+            {cardAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Descrição">
+          <input
+            type="text"
+            required
+            autoFocus
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            className={`${inputClass} w-full`}
+            placeholder="Ex: Farmácia"
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Valor (R$)">
+            <input
+              type="number"
+              required
+              min="0.01"
+              step="0.01"
+              value={form.amount}
+              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              className={`${inputClass} w-full`}
+            />
+          </Field>
+          <Field label="Data da compra">
+            <input
+              type="date"
+              required
+              value={form.purchaseDate}
+              onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))}
+              className={`${inputClass} w-full`}
+            />
+          </Field>
+        </div>
+
+        <Field label="Categoria">
+          <select
+            value={form.categoryId}
+            onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+            className={`${inputClass} w-full`}
+          >
+            <option value="">Sem categoria</option>
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {billingDate && (
+          <p className="text-xs text-slate-400">
+            Cai na fatura de {billingDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+          </p>
+        )}
 
         {error && <p className="text-xs text-rose-600">{error}</p>}
         <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
@@ -358,8 +501,10 @@ export function CardsTab({
   onImportFatura,
   onUpdateTransaction,
   onDeleteTransaction,
+  onCreateCashExpense,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [cashModalOpen, setCashModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
@@ -367,13 +512,20 @@ export function CardsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <button
           onClick={() => setImportOpen(true)}
           disabled={cardAccounts.length === 0}
           className={secondaryButtonClass + " disabled:opacity-60"}
         >
           <Upload size={13} /> Importar fatura
+        </button>
+        <button
+          onClick={() => setCashModalOpen(true)}
+          disabled={cardAccounts.length === 0}
+          className={secondaryButtonClass + " disabled:opacity-60"}
+        >
+          <Plus size={13} /> Compra à vista
         </button>
         <button
           onClick={() => setModalOpen(true)}
@@ -424,6 +576,14 @@ export function CardsTab({
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onSubmit={onCreatePurchase}
+        cardAccounts={cardAccounts}
+        categories={categories}
+      />
+
+      <NewCashPurchaseModal
+        isOpen={cashModalOpen}
+        onClose={() => setCashModalOpen(false)}
+        onSubmit={onCreateCashExpense}
         cardAccounts={cardAccounts}
         categories={categories}
       />

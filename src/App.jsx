@@ -209,7 +209,11 @@ export default function App() {
     try {
       const account = accounts.find((a) => a.id === draft.accountId);
       await recurringSeriesApi.createInstallmentPurchase(
-        { ...draft, dueDay: account?.dueDay ?? new Date(draft.purchaseDate).getDate() },
+        {
+          ...draft,
+          closingDay: account?.closingDay ?? new Date(draft.purchaseDate).getDate(),
+          dueDay: account?.dueDay ?? new Date(draft.purchaseDate).getDate(),
+        },
         profile.household_id
       );
       await refreshTransactionsAndSeries();
@@ -460,6 +464,7 @@ export default function App() {
               onImportFatura={importFaturaTransactions}
               onUpdateTransaction={editTransaction}
               onDeleteTransaction={removeTransaction}
+              onCreateCashExpense={createTransaction}
             />
           ) : tab === "budgets" ? (
             <BudgetsTab categories={categories} budgets={budgets} transactions={transactions} monthKey={monthKey} onSetBudget={setBudget} />

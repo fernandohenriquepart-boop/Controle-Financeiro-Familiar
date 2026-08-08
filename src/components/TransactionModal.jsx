@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { ArrowUpCircle, ArrowDownCircle, CreditCard } from "lucide-react";
 import { Modal, Field, inputClass, primaryButtonClass } from "./ui";
 import { DocumentScanButton } from "./DocumentScanButton";
 import { toDateInputValue, emptyTransactionForm as emptyForm } from "../domain";
+import { billingDueDate } from "../lib/installments";
 
 // Formulário de criar/editar lançamento — compartilhado entre a aba
 // Lançamentos e o detalhe de um cartão (Lançamentos Cartões), pra manter uma
@@ -25,6 +26,12 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
   }, [isOpen, initial]);
 
   const filteredCategories = categories.filter((c) => c.type === form.type);
+  const selectedAccount = accounts.find((a) => a.id === form.accountId);
+  const isCardAccount = selectedAccount?.type === "cartao_credito";
+  const cardBillingDate =
+    isCardAccount && form.date && selectedAccount.closingDay && selectedAccount.dueDay
+      ? billingDueDate(new Date(form.date + "T00:00:00"), selectedAccount.closingDay, selectedAccount.dueDay)
+      : null;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -36,7 +43,8 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
     setIsSubmitting(true);
     try {
       const recurring = !isEditing && repeats ? { months: repeatMonths ? Number(repeatMonths) : null } : null;
-      await onSubmit({ ...form, amount: Number(form.amount) }, recurring);
+      const date = cardBillingDate ? toDateInputValue(cardBillingDate) : form.date;
+      await onSubmit({ ...form, amount: Number(form.amount), date }, recurring);
       onClose();
     } catch (err) {
       setError(err.message || "Não foi possível salvar.");
@@ -116,6 +124,11 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
               onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
               className={`${inputClass} w-full`}
             />
+            {cardBillingDate && (
+              <span className="flex items-center gap-1 text-[11px] text-slate-400">
+                <CreditCard size={11} /> Cai na fatura de {cardBillingDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+              </span>
+            )}
           </Field>
           <Field label="Categoria">
             <select

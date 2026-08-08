@@ -56,10 +56,16 @@ async function insertSeriesRow(series, householdId) {
 
 /** Cria uma compra parcelada de cartão: a série + as N transações já materializadas. */
 export async function createInstallmentPurchase(
-  { description, totalAmount, count, categoryId, accountId, dueDay, purchaseDate },
+  { description, totalAmount, count, categoryId, accountId, closingDay, dueDay, purchaseDate },
   householdId
 ) {
-  const schedule = buildInstallmentSchedule({ purchaseDate: new Date(purchaseDate), dueDay, count, totalAmount });
+  const schedule = buildInstallmentSchedule({
+    purchaseDate: new Date(purchaseDate),
+    closingDay,
+    dueDay,
+    count,
+    totalAmount,
+  });
   const series = await insertSeriesRow(
     {
       kind: "installment",
