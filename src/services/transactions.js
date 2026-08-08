@@ -13,6 +13,7 @@ function mapFromDb(row) {
     recurrenceRule: row.recurrence_rule ?? undefined,
     createdBy: row.created_by ?? undefined,
     seriesId: row.series_id ?? undefined,
+    isFixed: row.is_fixed ?? false,
     createdAt: row.created_at,
   };
 }
@@ -31,6 +32,7 @@ function mapToDb(transaction, householdId) {
     recurrence_rule: transaction.recurrenceRule || null,
     created_by: transaction.createdBy || null,
     series_id: transaction.seriesId || null,
+    is_fixed: transaction.isFixed ?? false,
   };
 }
 
@@ -72,6 +74,7 @@ export async function updateTransaction(id, changes) {
   if ("date" in changes) row.date = changes.date;
   if ("isRecurring" in changes) row.is_recurring = changes.isRecurring;
   if ("recurrenceRule" in changes) row.recurrence_rule = changes.recurrenceRule || null;
+  if ("isFixed" in changes) row.is_fixed = changes.isFixed;
   const { error } = await supabase.from("transactions").update(row).eq("id", id);
   if (error) throw error;
 }

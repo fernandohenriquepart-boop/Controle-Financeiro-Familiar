@@ -83,6 +83,7 @@ export function buildEditPayload(transaction) {
     date: transaction.date,
     categoryId: transaction.categoryId ?? "",
     accountId: transaction.accountId ?? "",
+    isFixed: transaction.isFixed ?? false,
     __id: transaction.id,
   };
 }

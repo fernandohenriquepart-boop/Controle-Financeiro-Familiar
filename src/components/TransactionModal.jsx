@@ -13,6 +13,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
   const [form, setForm] = useState(initial ?? emptyForm());
   const [repeats, setRepeats] = useState(false);
   const [repeatMonths, setRepeatMonths] = useState("");
+  const [isFixed, setIsFixed] = useState(initial?.isFixed ?? false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = Boolean(initial?.__id);
@@ -22,8 +23,14 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
       setForm(initial ?? emptyForm());
       setRepeats(false);
       setRepeatMonths("");
+      setIsFixed(initial?.isFixed ?? false);
     }
   }, [isOpen, initial]);
+
+  function handleRepeatsChange(checked) {
+    setRepeats(checked);
+    if (checked) setIsFixed(true); // recorrência normalmente é despesa fixa — só um empurrão inicial, dá pra desmarcar
+  }
 
   const filteredCategories = categories.filter((c) => c.type === form.type);
   const selectedAccount = accounts.find((a) => a.id === form.accountId);
@@ -44,7 +51,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
     try {
       const recurring = !isEditing && repeats ? { months: repeatMonths ? Number(repeatMonths) : null } : null;
       const date = cardBillingDate ? toDateInputValue(cardBillingDate) : form.date;
-      await onSubmit({ ...form, amount: Number(form.amount), date }, recurring);
+      await onSubmit({ ...form, amount: Number(form.amount), date, isFixed }, recurring);
       onClose();
     } catch (err) {
       setError(err.message || "Não foi possível salvar.");
@@ -161,13 +168,23 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
           </select>
         </Field>
 
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={isFixed}
+            onChange={(e) => setIsFixed(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+          />
+          Despesa fixa (aluguel, assinatura...)
+        </label>
+
         {!isEditing && (
           <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
                 checked={repeats}
-                onChange={(e) => setRepeats(e.target.checked)}
+                onChange={(e) => handleRepeatsChange(e.target.checked)}
                 className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               Repete nos próximos meses?

@@ -15,7 +15,7 @@ import {
 
 const CHART_COLORS = ["#059669", "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#d97706", "#64748b"];
 
-function SummaryCard({ icon: Icon, label, value, tone }) {
+function SummaryCard({ icon: Icon, label, value, tone, subtitle }) {
   return (
     <Card className="flex items-center gap-3">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tone}`}>
@@ -24,6 +24,7 @@ function SummaryCard({ icon: Icon, label, value, tone }) {
       <div className="min-w-0">
         <p className="text-xs text-slate-500">{label}</p>
         <p className="truncate text-lg font-semibold text-slate-900">{value}</p>
+        {subtitle && <p className="truncate text-[11px] text-slate-400">{subtitle}</p>}
       </div>
     </Card>
   );
@@ -55,6 +56,8 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
   const monthTx = transactionsInMonth(transactions, monthKey);
   const income = sumByType(monthTx, "income");
   const expense = sumByType(monthTx, "expense");
+  const fixedExpense = monthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
+  const variableExpense = expense - fixedExpense;
   const balance = totalBalance(accounts, transactions);
   const expenseByCategory = categoryTotals(monthTx, categories, "expense");
   const pendingBills = upcomingBills(bills, { days: 15 });
@@ -70,7 +73,13 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard icon={Wallet} label="Saldo total" value={formatCurrency(balance)} tone="bg-emerald-50 text-emerald-600" />
         <SummaryCard icon={TrendingUp} label="Receitas do mês" value={formatCurrency(income)} tone="bg-blue-50 text-blue-600" />
-        <SummaryCard icon={TrendingDown} label="Despesas do mês" value={formatCurrency(expense)} tone="bg-rose-50 text-rose-600" />
+        <SummaryCard
+          icon={TrendingDown}
+          label="Despesas do mês"
+          value={formatCurrency(expense)}
+          tone="bg-rose-50 text-rose-600"
+          subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)}`}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

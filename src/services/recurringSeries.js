@@ -145,7 +145,7 @@ export async function createInstallmentPurchaseFromImport(
 /** Cria uma despesa/receita recorrente: a série + as ocorrências já materializadas
  * (limitadas a INDEFINITE_HORIZON_MONTHS quando count é null / sem fim). */
 export async function createRecurringTransaction(
-  { type, amount, description, categoryId, accountId, startDate, count },
+  { type, amount, description, categoryId, accountId, startDate, count, isFixed = true },
   householdId
 ) {
   const toGenerate = count ?? INDEFINITE_HORIZON_MONTHS;
@@ -173,6 +173,7 @@ export async function createRecurringTransaction(
     date: s.date.toISOString().slice(0, 10),
     isRecurring: true,
     seriesId: series.id,
+    isFixed,
   }));
   await insertTransactionsBulk(transactions, householdId);
   return series;
@@ -220,6 +221,7 @@ export async function extendIndefiniteSeries(householdId) {
       date: date.toISOString().slice(0, 10),
       isRecurring: true,
       seriesId: series.id,
+      isFixed: true, // séries "recorrentes" (não parceladas) são despesa fixa por natureza
     }));
     await insertTransactionsBulk(transactions, householdId);
     await updateInstallmentsGenerated(series.id, newHorizonCount);

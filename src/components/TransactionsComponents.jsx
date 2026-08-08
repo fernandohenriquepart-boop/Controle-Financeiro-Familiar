@@ -86,8 +86,14 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
   const [editing, setEditing] = useState(null);
   const [selectedCardAccount, setSelectedCardAccount] = useState(null);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
+  const [fixedFilter, setFixedFilter] = useState("all"); // "all" | "fixed" | "variable"
 
-  const monthTx = transactionsInMonth(transactions, monthKey);
+  const monthTxAll = transactionsInMonth(transactions, monthKey);
+  const monthTx = monthTxAll.filter((t) => {
+    if (fixedFilter === "fixed") return t.isFixed;
+    if (fixedFilter === "variable") return !t.isFixed;
+    return true;
+  });
   const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
   const otherTx = monthTx.filter((t) => !cardAccountIds.has(t.accountId));
   const cardGroups = accounts
@@ -129,13 +135,32 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-end gap-2">
-        <button onClick={() => openCreate("expense")} className={secondaryButtonClass}>
-          <Plus size={13} /> Despesa
-        </button>
-        <button onClick={() => openCreate("income")} className={primaryButtonClass + " !px-3 !py-1.5 text-xs"}>
-          <Plus size={13} /> Receita
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm">
+          {[
+            { id: "all", label: "Todas" },
+            { id: "fixed", label: "Fixas" },
+            { id: "variable", label: "Variáveis" },
+          ].map((opt) => (
+            <button
+              key={opt.id}
+              onClick={() => setFixedFilter(opt.id)}
+              className={`rounded-md px-3 py-1.5 font-medium ${
+                fixedFilter === opt.id ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => openCreate("expense")} className={secondaryButtonClass}>
+            <Plus size={13} /> Despesa
+          </button>
+          <button onClick={() => openCreate("income")} className={primaryButtonClass + " !px-3 !py-1.5 text-xs"}>
+            <Plus size={13} /> Receita
+          </button>
+        </div>
       </div>
 
       {cardGroups.length > 0 && (
@@ -166,8 +191,10 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
       )}
 
       <Card>
-        {monthTx.length === 0 ? (
+        {monthTxAll.length === 0 ? (
           <EmptyState title="Nenhum lançamento neste mês" description="Adicione uma receita ou despesa para começar." />
+        ) : monthTx.length === 0 ? (
+          <EmptyState title="Nenhum lançamento com esse filtro" description="Troque para 'Todas' pra ver os lançamentos do mês." />
         ) : otherTx.length === 0 ? (
           <EmptyState title="Só lançamentos de cartão neste mês" description="Veja os detalhes acima, em Cartões." />
         ) : (
