@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
 import { ImportFaturaModal } from "./ImportFaturaModal";
 import { MonthSwitcher } from "./DashboardComponents";
@@ -9,10 +9,11 @@ import {
   formatMonthLabel,
   transactionsInMonth,
   sumByType,
-  totalBalance,
   currentMonthKey,
   shiftMonthKey,
 } from "../domain";
+
+const CARD_CHART_COLORS = ["#7c3aed", "#0891b2", "#db2777", "#059669", "#d97706", "#dc2626", "#2563eb", "#65a30d"];
 
 function emptyForm(accounts) {
   return {
@@ -179,12 +180,12 @@ function CardSummary({ account, transactions, onSelect }) {
   );
 }
 
-function CardDetailModal({ account, transactions, categories, isOpen, onClose }) {
-  const [monthKey, setMonthKey] = useState(currentMonthKey());
+export function CardDetailModal({ account, transactions, categories, isOpen, onClose, initialMonthKey }) {
+  const [monthKey, setMonthKey] = useState(initialMonthKey ?? currentMonthKey());
 
   useMemo(() => {
-    if (isOpen) setMonthKey(currentMonthKey());
-  }, [isOpen]);
+    if (isOpen) setMonthKey(initialMonthKey ?? currentMonthKey());
+  }, [isOpen, initialMonthKey]);
 
   if (!account) return null;
 
@@ -251,33 +252,50 @@ function PurchaseProgress({ series, account, transactions, onDelete }) {
   );
 }
 
-function ProjectedCashFlow({ accounts, transactions }) {
-  const startBalance = totalBalance(accounts, transactions);
+function CardsMonthlyChart({ accounts, transactions }) {
+  const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
   const months = Array.from({ length: 12 }, (_, i) => shiftMonthKey(currentMonthKey(), i));
-  let running = startBalance;
   const data = months.map((monthKey) => {
     const monthTx = transactionsInMonth(transactions, monthKey);
-    const net = sumByType(monthTx, "income") - sumByType(monthTx, "expense");
-    running += net;
-    return { month: formatMonthLabel(monthKey).slice(0, 3), saldo: Math.round(running * 100) / 100 };
+    const row = { month: formatMonthLabel(monthKey).slice(0, 3) };
+    for (const account of cardAccounts) {
+      row[account.name] = sumByType(
+        monthTx.filter((t) => t.accountId === account.id),
+        "expense"
+      );
+    }
+    return row;
   });
 
   return (
     <Card>
       <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-        <TrendingUp size={15} /> Fluxo de caixa projetado (12 meses)
+        <TrendingUp size={15} /> Gastos por cartão (12 meses)
       </h3>
-      <div className="h-56 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
-            <Tooltip formatter={(v) => formatCurrency(v)} />
-            <Bar dataKey="saldo" fill="#7c3aed" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      {cardAccounts.length === 0 ? (
+        <EmptyState title="Nenhum cartão cadastrado" />
+      ) : (
+        <div className="h-56 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+              <Tooltip formatter={(v) => formatCurrency(v)} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              {cardAccounts.map((account, i) => (
+                <Bar
+                  key={account.id}
+                  dataKey={account.name}
+                  stackId="cards"
+                  fill={CARD_CHART_COLORS[i % CARD_CHART_COLORS.length]}
+                  radius={i === cardAccounts.length - 1 ? [4, 4, 0, 0] : undefined}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </Card>
   );
 }
@@ -342,7 +360,7 @@ export function CardsTab({ accounts, transactions, categories, series, onCreateP
         )}
       </Card>
 
-      <ProjectedCashFlow accounts={accounts} transactions={transactions} />
+      <CardsMonthlyChart accounts={accounts} transactions={transactions} />
 
       <NewPurchaseModal
         isOpen={modalOpen}

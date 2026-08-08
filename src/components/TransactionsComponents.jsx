@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, ChevronRight } from "lucide-react";
 import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
 import { DocumentScanButton } from "./DocumentScanButton";
-import { formatCurrency, transactionsInMonth, colorPreset, toDateInputValue } from "../domain";
+import { CardDetailModal } from "./CardsComponents";
+import { formatCurrency, transactionsInMonth, sumByType, colorPreset, toDateInputValue } from "../domain";
 
 function emptyForm(type = "expense") {
   return {
@@ -196,8 +197,15 @@ function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, ini
 export function TransactionsTab({ transactions, categories, accounts, monthKey, onCreate, onCreateRecurring, onUpdate, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [selectedCardAccount, setSelectedCardAccount] = useState(null);
 
   const monthTx = transactionsInMonth(transactions, monthKey);
+  const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
+  const otherTx = monthTx.filter((t) => !cardAccountIds.has(t.accountId));
+  const cardGroups = accounts
+    .filter((a) => cardAccountIds.has(a.id))
+    .map((a) => ({ account: a, total: sumByType(monthTx.filter((t) => t.accountId === a.id), "expense") }))
+    .filter((g) => g.total > 0);
 
   function openCreate(type) {
     setEditing({ __new: true, ...emptyForm(type) });
@@ -239,12 +247,41 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
         </button>
       </div>
 
+      {cardGroups.length > 0 && (
+        <Card>
+          <h3 className="mb-2 text-sm font-semibold text-slate-800">Cartões</h3>
+          <ul className="divide-y divide-slate-100">
+            {cardGroups.map(({ account, total }) => (
+              <li key={account.id}>
+                <button
+                  onClick={() => setSelectedCardAccount(account)}
+                  className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm hover:bg-slate-50"
+                >
+                  <div className="flex min-w-0 items-center gap-2.5">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                      <CreditCard size={15} />
+                    </span>
+                    <p className="truncate font-medium text-slate-800">{account.name}</p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="font-medium text-rose-600">{formatCurrency(total)}</span>
+                    <ChevronRight size={15} className="text-slate-300" />
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <Card>
         {monthTx.length === 0 ? (
           <EmptyState title="Nenhum lançamento neste mês" description="Adicione uma receita ou despesa para começar." />
+        ) : otherTx.length === 0 ? (
+          <EmptyState title="Só lançamentos de cartão neste mês" description="Veja os detalhes acima, em Cartões." />
         ) : (
           <ul className="divide-y divide-slate-100">
-            {monthTx.map((t) => {
+            {otherTx.map((t) => {
               const category = categories.find((c) => c.id === t.categoryId);
               const account = accounts.find((a) => a.id === t.accountId);
               const preset = colorPreset(category?.colorId);
@@ -292,6 +329,15 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
         categories={categories}
         accounts={accounts}
         initial={editing}
+      />
+
+      <CardDetailModal
+        account={selectedCardAccount}
+        transactions={transactions}
+        categories={categories}
+        isOpen={!!selectedCardAccount}
+        onClose={() => setSelectedCardAccount(null)}
+        initialMonthKey={monthKey}
       />
     </div>
   );
