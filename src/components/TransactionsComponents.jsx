@@ -1,28 +1,58 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, ChevronRight, Tag } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, ChevronRight, Tag, Receipt } from "lucide-react";
 import { Card, Modal, EmptyState, secondaryButtonClass, primaryButtonClass } from "./ui";
 import { CardDetailModal } from "./CardsComponents";
 import { TransactionModal } from "./TransactionModal";
-import { formatCurrency, transactionsInMonth, sumByType, colorPreset, emptyTransactionForm as emptyForm, buildEditPayload } from "../domain";
+import { BillModal } from "./BillsComponents";
+import {
+  formatCurrency,
+  formatMonthLabel,
+  transactionsInMonth,
+  sumByType,
+  colorPreset,
+  emptyTransactionForm as emptyForm,
+  buildEditPayload,
+} from "../domain";
 
-function CategoryDetailModal({ category, transactions, categories, accounts, isOpen, onClose, onUpdate, onDelete }) {
+function CategoryDetailModal({ category, transactions, categories, accounts, monthKey, isOpen, onClose, onUpdate, onDelete, onCreateBill }) {
   const [editing, setEditing] = useState(null);
+  const [billDraft, setBillDraft] = useState(null);
 
   const txs = [...transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
   const total = txs.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0);
   const preset = colorPreset(category?.colorId);
+  const isExpenseGroup = category ? category.type === "expense" : total < 0;
+  const canCreateBill = Boolean(onCreateBill && isExpenseGroup && total !== 0);
 
   async function handleEditSubmit(form) {
     const { __id, ...payload } = form;
     await onUpdate(__id, payload);
   }
 
+  function openBillDraft() {
+    setBillDraft({
+      type: "payable",
+      description: `${category?.name ?? "Sem categoria"} — ${formatMonthLabel(monthKey)}`,
+      amount: String(Math.abs(total)),
+      dueDate: new Date().toISOString().slice(0, 10),
+      categoryId: category?.id ?? "",
+      accountId: "",
+    });
+  }
+
   return (
     <Modal title={category?.name ?? "Sem categoria"} isOpen={isOpen} onClose={onClose} wide>
       <div className="flex flex-col gap-3">
-        <p className="text-sm text-slate-600">
-          Total: <span className={`font-semibold ${total >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrency(total)}</span>
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-slate-600">
+            Total: <span className={`font-semibold ${total >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrency(total)}</span>
+          </p>
+          {canCreateBill && (
+            <button onClick={openBillDraft} className={secondaryButtonClass}>
+              <Receipt size={13} /> Lançar como conta a pagar
+            </button>
+          )}
+        </div>
 
         {txs.length === 0 ? (
           <EmptyState title="Nenhum lançamento" />
@@ -77,6 +107,17 @@ function CategoryDetailModal({ category, transactions, categories, accounts, isO
         accounts={accounts}
         initial={editing}
       />
+
+      {canCreateBill && (
+        <BillModal
+          isOpen={!!billDraft}
+          onClose={() => setBillDraft(null)}
+          onSubmit={onCreateBill}
+          categories={categories}
+          accounts={accounts}
+          initial={billDraft}
+        />
+      )}
     </Modal>
   );
 }
@@ -92,6 +133,7 @@ export function TransactionsTab({
   onDelete,
   bills,
   onCloseFatura,
+  onCreateBill,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -271,10 +313,12 @@ export function TransactionsTab({
         transactions={selectedCategoryGroup?.txs ?? []}
         categories={categories}
         accounts={accounts}
+        monthKey={monthKey}
         isOpen={!!selectedCategoryGroup}
         onClose={() => setSelectedCategoryKey(null)}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onCreateBill={onCreateBill}
       />
     </div>
   );

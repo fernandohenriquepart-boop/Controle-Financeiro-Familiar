@@ -15,7 +15,7 @@ function emptyForm(type = "payable") {
   };
 }
 
-function BillModal({ isOpen, onClose, onSubmit, categories, accounts, initial }) {
+export function BillModal({ isOpen, onClose, onSubmit, categories, accounts, initial }) {
   const [form, setForm] = useState(initial ?? emptyForm());
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);

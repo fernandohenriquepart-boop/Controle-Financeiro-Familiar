@@ -462,6 +462,7 @@ export default function App() {
               onDelete={removeTransaction}
               bills={bills}
               onCloseFatura={createBill}
+              onCreateBill={createBill}
             />
           ) : tab === "cards" ? (
             <CardsTab
