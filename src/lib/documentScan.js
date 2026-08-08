@@ -75,13 +75,32 @@ function normalize(extraction, source) {
   };
 }
 
-async function extractPdfText(file) {
+export class PdfPasswordRequiredError extends Error {
+  constructor(incorrect = false) {
+    super(incorrect ? "Senha incorreta." : "Este PDF é protegido por senha.");
+    this.name = "PdfPasswordRequiredError";
+    this.incorrect = incorrect;
+  }
+}
+
+/** Extrai o texto de um PDF. Se ele pedir senha e nenhuma (ou uma errada) foi
+ * passada, lança PdfPasswordRequiredError em vez de deixar o erro genérico
+ * do pdfjs vazar — quem chama decide se quer pedir a senha pro usuário. */
+export async function extractPdfText(file, password) {
   const pdfjsLib = await import("pdfjs-dist");
   const workerUrl = (await import("pdfjs-dist/build/pdf.worker.mjs?url")).default;
   pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
 
   const buffer = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+  let pdf;
+  try {
+    pdf = await pdfjsLib.getDocument({ data: buffer, password }).promise;
+  } catch (err) {
+    if (err?.name === "PasswordException") {
+      throw new PdfPasswordRequiredError(err.code === pdfjsLib.PasswordResponses.INCORRECT_PASSWORD);
+    }
+    throw err;
+  }
   let text = "";
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);

@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, CreditCard, TrendingUp } from "lucide-react";
+import { Plus, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid } from "recharts";
-import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, ProgressBar } from "./ui";
+import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
+import { ImportFaturaModal } from "./ImportFaturaModal";
 import {
   formatCurrency,
   formatMonthLabel,
@@ -228,14 +229,22 @@ function ProjectedCashFlow({ accounts, transactions }) {
   );
 }
 
-export function CardsTab({ accounts, transactions, categories, series, onCreatePurchase, onDeleteSeries }) {
+export function CardsTab({ accounts, transactions, categories, series, onCreatePurchase, onDeleteSeries, onImportFatura }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
   const purchaseSeries = series.filter((s) => s.kind === "installment");
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setImportOpen(true)}
+          disabled={cardAccounts.length === 0}
+          className={secondaryButtonClass + " disabled:opacity-60"}
+        >
+          <Upload size={13} /> Importar fatura
+        </button>
         <button
           onClick={() => setModalOpen(true)}
           disabled={cardAccounts.length === 0}
@@ -287,6 +296,15 @@ export function CardsTab({ accounts, transactions, categories, series, onCreateP
         onSubmit={onCreatePurchase}
         cardAccounts={cardAccounts}
         categories={categories}
+      />
+
+      <ImportFaturaModal
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        cardAccounts={cardAccounts}
+        categories={categories}
+        transactions={transactions}
+        onImport={onImportFatura}
       />
     </div>
   );

@@ -89,6 +89,53 @@ export async function createInstallmentPurchase(
   return series;
 }
 
+/**
+ * Cria uma compra parcelada a partir de um lançamento já em andamento,
+ * detectado ao importar uma fatura (ex: "parcela 3 de 12"): materializa a
+ * parcela atual com a data/valor exatos lidos da fatura, e gera só as
+ * parcelas *restantes* (não regenera as que já passaram antes da importação).
+ */
+export async function createInstallmentPurchaseFromImport(
+  { description, installmentAmount, currentInstallment, totalInstallments, categoryId, accountId, currentDate },
+  householdId
+) {
+  const remaining = totalInstallments - currentInstallment;
+  const futureDates = remaining > 0 ? monthlyDates(new Date(currentDate), remaining + 1).slice(1) : [];
+
+  const series = await insertSeriesRow(
+    {
+      kind: "installment",
+      type: "expense",
+      description,
+      categoryId,
+      accountId,
+      totalAmount: installmentAmount * totalInstallments,
+      installmentAmount,
+      installmentCount: totalInstallments,
+      installmentsGenerated: totalInstallments,
+      startDate: currentDate,
+    },
+    householdId
+  );
+
+  const transactions = [
+    { date: new Date(currentDate), number: currentInstallment },
+    ...futureDates.map((date, i) => ({ date, number: currentInstallment + i + 1 })),
+  ].map(({ date, number }) => ({
+    type: "expense",
+    accountId,
+    categoryId,
+    amount: installmentAmount,
+    description: `${description} (${number}/${totalInstallments})`,
+    date: date.toISOString().slice(0, 10),
+    isRecurring: true,
+    seriesId: series.id,
+  }));
+
+  await insertTransactionsBulk(transactions, householdId);
+  return series;
+}
+
 /** Cria uma despesa/receita recorrente: a série + as ocorrências já materializadas
  * (limitadas a INDEFINITE_HORIZON_MONTHS quando count é null / sem fim). */
 export async function createRecurringTransaction(

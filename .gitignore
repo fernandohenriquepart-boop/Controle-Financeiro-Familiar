@@ -14,6 +14,10 @@ dist-ssr
 
 .claude/settings.local.json
 
+# Documentos pessoais (faturas etc.) usados como referência de layout —
+# nunca devem ir pro repositório.
+*.pdf
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

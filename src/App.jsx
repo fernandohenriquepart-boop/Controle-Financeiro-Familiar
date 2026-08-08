@@ -226,6 +226,18 @@ export default function App() {
       flashSyncError(err);
     }
   }
+  async function importFaturaTransactions({ plainTransactions, installmentPurchases }) {
+    if (plainTransactions.length > 0) {
+      await transactionsApi.insertTransactionsBulk(
+        plainTransactions.map((t) => ({ ...t, type: "expense", isRecurring: false })),
+        profile.household_id
+      );
+    }
+    for (const purchase of installmentPurchases) {
+      await recurringSeriesApi.createInstallmentPurchaseFromImport(purchase, profile.household_id);
+    }
+    await refreshTransactionsAndSeries();
+  }
 
   // --- Orçamentos --------------------------------------------------------
   async function setBudget(categoryId, limitAmount) {
@@ -445,6 +457,7 @@ export default function App() {
               series={series}
               onCreatePurchase={createCardPurchase}
               onDeleteSeries={removeSeries}
+              onImportFatura={importFaturaTransactions}
             />
           ) : tab === "budgets" ? (
             <BudgetsTab categories={categories} budgets={budgets} transactions={transactions} monthKey={monthKey} onSetBudget={setBudget} />
