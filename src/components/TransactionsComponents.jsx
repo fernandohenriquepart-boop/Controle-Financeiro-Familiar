@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
 import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
-import { formatCurrency, transactionsInMonth, colorPreset } from "../domain";
+import { DocumentScanButton } from "./DocumentScanButton";
+import { formatCurrency, transactionsInMonth, colorPreset, toDateInputValue } from "../domain";
 
 function emptyForm(type = "expense") {
   return {
@@ -66,6 +67,20 @@ function TransactionModal({ isOpen, onClose, onSubmit, categories, accounts, ini
             <ArrowUpCircle size={15} /> Receita
           </button>
         </div>
+
+        {form.type === "expense" && (
+          <DocumentScanButton
+            label="Escanear recibo"
+            onExtracted={(result) => {
+              setForm((f) => ({
+                ...f,
+                amount: result.amount != null ? String(result.amount) : f.amount,
+                date: result.date ? toDateInputValue(result.date) : f.date,
+                description: result.description ?? f.description,
+              }));
+            }}
+          />
+        )}
 
         <Field label="Valor (R$)">
           <input

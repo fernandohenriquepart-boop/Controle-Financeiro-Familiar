@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, CheckCircle2, AlertTriangle, Circle } from "lucide-react";
 import { Card, Modal, Field, EmptyState, Badge, inputClass, primaryButtonClass } from "./ui";
-import { formatCurrency, isOverdue } from "../domain";
+import { DocumentScanButton } from "./DocumentScanButton";
+import { formatCurrency, isOverdue, toDateInputValue } from "../domain";
 
 function emptyForm(type = "payable") {
   return {
@@ -68,6 +69,21 @@ function BillModal({ isOpen, onClose, onSubmit, categories, accounts, initial })
             A receber
           </button>
         </div>
+
+        {form.type === "payable" && (
+          <DocumentScanButton
+            label="Escanear boleto"
+            allowManualLinhaDigitavel
+            onExtracted={(result) => {
+              setForm((f) => ({
+                ...f,
+                amount: result.amount != null ? String(result.amount) : f.amount,
+                dueDate: result.date ? toDateInputValue(result.date) : f.dueDate,
+                description: result.description ?? f.description,
+              }));
+            }}
+          />
+        )}
 
         <Field label="Descrição">
           <input

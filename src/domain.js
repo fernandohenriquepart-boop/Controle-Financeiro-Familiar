@@ -59,6 +59,11 @@ export function monthKeyFromDate(dateStr) {
   return `${dateStr.slice(0, 7)}-01`;
 }
 
+export function toDateInputValue(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function shiftMonthKey(monthKey, delta) {
   const [y, m] = monthKey.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);
