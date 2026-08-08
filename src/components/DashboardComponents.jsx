@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Scale, AlertTriangle, Pencil, Trash2, CreditCard } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Scale, AlertTriangle, Pencil, Trash2, CreditCard } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Modal, EmptyState, Badge } from "./ui";
 import { TransactionModal } from "./TransactionModal";
@@ -8,7 +8,6 @@ import {
   formatMonthLabel,
   transactionsInMonth,
   sumByType,
-  totalBalance,
   categoryTotals,
   colorPreset,
   upcomingBills,
@@ -178,7 +177,6 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
   const fixedExpense = nonCardMonthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
   const variableExpense = nonCardExpense - fixedExpense;
   const result = income - expense;
-  const balance = totalBalance(accounts, transactions, bills);
   const expenseByCategory = categoryTotals(nonCardMonthTx, categories, "expense");
   const pendingBills = upcomingBills(bills, { days: 15 });
 
@@ -190,8 +188,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard icon={Wallet} label="Saldo total" value={formatCurrency(balance)} tone="bg-emerald-50 text-emerald-600" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SummaryCard icon={TrendingUp} label="Receitas do mês" value={formatCurrency(income)} tone="bg-blue-50 text-blue-600" />
         <SummaryCard
           icon={TrendingDown}

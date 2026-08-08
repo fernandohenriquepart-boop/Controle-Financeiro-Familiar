@@ -272,11 +272,25 @@ export function BillsTab({ bills, categories, accounts, onCreate, onUpdate, onDe
           <ul className="divide-y divide-slate-100">
             {paid.slice(0, 10).map((bill) => (
               <li key={bill.id} className="flex items-center justify-between gap-3 py-2 text-sm text-slate-400">
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <CheckCircle2 size={16} className="shrink-0 text-emerald-500" />
-                  <span className="truncate line-through">{bill.description}</span>
-                </span>
-                <span className="shrink-0">{formatCurrency(bill.amount)}</span>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <button
+                    onClick={() => onUpdate(bill.id, { status: "pending", paidAt: null })}
+                    title="Desmarcar como paga"
+                    className="shrink-0 text-emerald-500 hover:text-slate-300"
+                  >
+                    <CheckCircle2 size={18} />
+                  </button>
+                  <span className="min-w-0 truncate line-through">{bill.description}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <span>{formatCurrency(bill.amount)}</span>
+                  <button onClick={() => openEdit(bill)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={() => onDelete(bill.id)} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
