@@ -204,6 +204,15 @@ export default function App() {
     }
   }
 
+  async function replicateCategoryTransactions(groupTransactions, months) {
+    try {
+      await recurringSeriesApi.replicateTransactionsToFutureMonths(groupTransactions, months, profile.household_id);
+      await refreshTransactionsAndSeries();
+    } catch (err) {
+      flashSyncError(err);
+    }
+  }
+
   // --- Lançamentos Cartões -----------------------------------------------
   async function createCardPurchase(draft) {
     try {
@@ -463,6 +472,7 @@ export default function App() {
               bills={bills}
               onCloseFatura={createBill}
               onCreateBill={createBill}
+              onReplicate={replicateCategoryTransactions}
             />
           ) : tab === "cards" ? (
             <CardsTab

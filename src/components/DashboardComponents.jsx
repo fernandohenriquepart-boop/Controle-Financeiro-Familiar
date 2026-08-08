@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Scale, AlertTriangle, Pencil, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Modal, EmptyState, Badge } from "./ui";
 import { TransactionModal } from "./TransactionModal";
@@ -140,12 +140,15 @@ export function MonthSwitcher({ monthKey, onChange }) {
 export function DashboardTab({ accounts, transactions, categories, bills, monthKey, onUpdate, onDelete }) {
   const [expensesModalOpen, setExpensesModalOpen] = useState(false);
   const monthTx = transactionsInMonth(transactions, monthKey);
+  const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
+  const nonCardMonthTx = monthTx.filter((t) => !cardAccountIds.has(t.accountId));
   const income = sumByType(monthTx, "income");
-  const expense = sumByType(monthTx, "expense");
-  const fixedExpense = monthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
+  const expense = sumByType(nonCardMonthTx, "expense");
+  const fixedExpense = nonCardMonthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
   const variableExpense = expense - fixedExpense;
+  const result = income - expense;
   const balance = totalBalance(accounts, transactions, bills);
-  const expenseByCategory = categoryTotals(monthTx, categories, "expense");
+  const expenseByCategory = categoryTotals(nonCardMonthTx, categories, "expense");
   const pendingBills = upcomingBills(bills, { days: 15 });
 
   const chartData = expenseByCategory.map((c) => ({
@@ -156,7 +159,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryCard icon={Wallet} label="Saldo total" value={formatCurrency(balance)} tone="bg-emerald-50 text-emerald-600" />
         <SummaryCard icon={TrendingUp} label="Receitas do mês" value={formatCurrency(income)} tone="bg-blue-50 text-blue-600" />
         <SummaryCard
@@ -164,8 +167,15 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           label="Despesas do mês"
           value={formatCurrency(expense)}
           tone="bg-rose-50 text-rose-600"
-          subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)}`}
+          subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)} · sem cartão`}
           onClick={() => setExpensesModalOpen(true)}
+        />
+        <SummaryCard
+          icon={Scale}
+          label="Resultado do mês"
+          value={formatCurrency(result)}
+          tone={result >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"}
+          subtitle="Receitas − despesas do mês"
         />
       </div>
 
@@ -256,7 +266,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
       <MonthExpensesModal
         isOpen={expensesModalOpen}
         onClose={() => setExpensesModalOpen(false)}
-        transactions={monthTx.filter((t) => t.type === "expense")}
+        transactions={nonCardMonthTx.filter((t) => t.type === "expense")}
         categories={categories}
         accounts={accounts}
         monthLabel={formatMonthLabel(monthKey)}

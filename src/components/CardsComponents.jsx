@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { Card, Modal, Field, EmptyState, Badge, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
 import { ImportFaturaModal } from "./ImportFaturaModal";
 import { MonthSwitcher } from "./DashboardComponents";
@@ -15,9 +15,11 @@ import {
   shiftMonthKey,
   buildEditPayload,
   toDateInputValue,
+  categoryTotals,
 } from "../domain";
 
 const CARD_CHART_COLORS = ["#7c3aed", "#0891b2", "#db2777", "#059669", "#d97706", "#dc2626", "#2563eb", "#65a30d"];
+const CATEGORY_CHART_COLORS = ["#059669", "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#d97706", "#64748b"];
 
 function emptyForm(accounts) {
   return {
@@ -507,7 +509,7 @@ function CardsMonthlyChart({ accounts, transactions }) {
   return (
     <Card>
       <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold text-slate-800">
-        <TrendingUp size={15} /> Gastos por cartão (12 meses)
+        <TrendingUp size={15} /> Gastos por cartão — próximos 12 meses
       </h3>
       {cardAccounts.length === 0 ? (
         <EmptyState title="Nenhum cartão cadastrado" />
@@ -537,6 +539,54 @@ function CardsMonthlyChart({ accounts, transactions }) {
   );
 }
 
+function CardsCategoryPieChart({ accounts, transactions, categories }) {
+  const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
+  const monthTx = transactionsInMonth(transactions, currentMonthKey()).filter((t) => cardAccountIds.has(t.accountId));
+  const expenseByCategory = categoryTotals(monthTx, categories, "expense");
+  const chartData = expenseByCategory.map((c) => ({
+    name: c.category?.name ?? "Sem categoria",
+    value: c.amount,
+  }));
+
+  return (
+    <Card>
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">Gastos por categoria (cartões)</h3>
+      {chartData.length === 0 ? (
+        <EmptyState title="Sem gastos de cartão neste mês" />
+      ) : (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="h-48 w-full sm:w-1/2">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={70} paddingAngle={2}>
+                  {chartData.map((entry, i) => (
+                    <Cell key={entry.name} fill={CATEGORY_CHART_COLORS[i % CATEGORY_CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => formatCurrency(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="flex-1 space-y-1.5 text-sm">
+            {chartData.slice(0, 8).map((c, i) => (
+              <li key={c.name} className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ background: CATEGORY_CHART_COLORS[i % CATEGORY_CHART_COLORS.length] }}
+                  />
+                  <span className="truncate">{c.name}</span>
+                </span>
+                <span className="shrink-0 font-medium text-slate-800">{formatCurrency(c.value)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function CardsTab({
   accounts,
   transactions,
@@ -560,7 +610,13 @@ export function CardsTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <CardsMonthlyChart accounts={accounts} transactions={transactions} />
+      <div className="flex flex-col gap-3">
+        <h2 className="text-sm font-semibold text-slate-800">Visão gerencial dos cartões</h2>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <CardsMonthlyChart accounts={accounts} transactions={transactions} />
+          <CardsCategoryPieChart accounts={accounts} transactions={transactions} categories={categories} />
+        </div>
+      </div>
 
       <div className="flex flex-wrap justify-end gap-2">
         <button

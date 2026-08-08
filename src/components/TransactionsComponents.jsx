@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, ChevronRight, Tag, Receipt } from "lucide-react";
-import { Card, Modal, EmptyState, secondaryButtonClass, primaryButtonClass } from "./ui";
+import { Plus, Pencil, Trash2, ArrowUpCircle, ArrowDownCircle, CreditCard, ChevronRight, Tag, Receipt, CalendarPlus } from "lucide-react";
+import { Card, Modal, EmptyState, Badge, inputClass, secondaryButtonClass, primaryButtonClass } from "./ui";
 import { CardDetailModal } from "./CardsComponents";
 import { TransactionModal } from "./TransactionModal";
 import { BillModal } from "./BillsComponents";
@@ -14,15 +14,90 @@ import {
   buildEditPayload,
 } from "../domain";
 
-function CategoryDetailModal({ category, transactions, categories, accounts, monthKey, isOpen, onClose, onUpdate, onDelete, onCreateBill }) {
+function groupTransactionsByCategory(txs, categories) {
+  const map = new Map();
+  for (const t of txs) {
+    const key = t.categoryId || "none";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(t);
+  }
+  return [...map.entries()]
+    .map(([key, groupTxs]) => ({
+      key,
+      category: key === "none" ? null : categories.find((c) => c.id === key),
+      txs: groupTxs,
+      total: groupTxs.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
+    }))
+    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+}
+
+function CategoryGroupsCard({ title, groups, onSelect }) {
+  if (groups.length === 0) return null;
+  return (
+    <Card>
+      <h3 className="mb-2 text-sm font-semibold text-slate-800">{title}</h3>
+      <ul className="divide-y divide-slate-100">
+        {groups.map(({ key, category, txs, total }) => {
+          const preset = colorPreset(category?.colorId);
+          return (
+            <li key={key}>
+              <button
+                onClick={() => onSelect(key)}
+                className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm hover:bg-slate-50"
+              >
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${preset.chip}`}>
+                    <Tag size={15} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-800">{category?.name ?? "Sem categoria"}</p>
+                    <p className="text-xs text-slate-400">
+                      {txs.length} lançamento{txs.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <span className={`font-medium ${total >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrency(total)}</span>
+                  <ChevronRight size={15} className="text-slate-300" />
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
+function CategoryDetailModal({
+  category,
+  transactions,
+  categories,
+  accounts,
+  monthKey,
+  isOpen,
+  onClose,
+  onUpdate,
+  onDelete,
+  onCreateBill,
+  bills,
+  onReplicate,
+}) {
   const [editing, setEditing] = useState(null);
   const [billDraft, setBillDraft] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [replicateOpen, setReplicateOpen] = useState(false);
+  const [replicateMonths, setReplicateMonths] = useState("3");
+  const [isReplicating, setIsReplicating] = useState(false);
 
   const txs = [...transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
   const total = txs.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0);
   const preset = colorPreset(category?.colorId);
   const isExpenseGroup = category ? category.type === "expense" : total < 0;
   const canCreateBill = Boolean(onCreateBill && isExpenseGroup && total !== 0);
+  const existingBill = bills?.find(
+    (b) => b.type === "payable" && (b.categoryId ?? "") === (category?.id ?? "") && b.dueDate?.slice(0, 7) === monthKey?.slice(0, 7)
+  );
 
   async function handleEditSubmit(form) {
     const { __id, ...payload } = form;
@@ -30,6 +105,7 @@ function CategoryDetailModal({ category, transactions, categories, accounts, mon
   }
 
   function openBillDraft() {
+    setSuccessMessage("");
     setBillDraft({
       type: "payable",
       description: `${category?.name ?? "Sem categoria"} — ${formatMonthLabel(monthKey)}`,
@@ -40,19 +116,66 @@ function CategoryDetailModal({ category, transactions, categories, accounts, mon
     });
   }
 
+  async function handleCreateBill(payload) {
+    await onCreateBill(payload);
+    setSuccessMessage("Conta a pagar lançada com sucesso.");
+  }
+
+  async function handleReplicate() {
+    const months = Math.max(1, Math.round(Number(replicateMonths) || 0));
+    setIsReplicating(true);
+    try {
+      await onReplicate(txs, months);
+      setSuccessMessage(`Replicado para os próximos ${months} ${months === 1 ? "mês" : "meses"}.`);
+      setReplicateOpen(false);
+    } finally {
+      setIsReplicating(false);
+    }
+  }
+
   return (
     <Modal title={category?.name ?? "Sem categoria"} isOpen={isOpen} onClose={onClose} wide>
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-slate-600">
             Total: <span className={`font-semibold ${total >= 0 ? "text-emerald-600" : "text-rose-600"}`}>{formatCurrency(total)}</span>
           </p>
-          {canCreateBill && (
-            <button onClick={openBillDraft} className={secondaryButtonClass}>
-              <Receipt size={13} /> Lançar como conta a pagar
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {onReplicate && txs.length > 0 && (
+              <button onClick={() => setReplicateOpen((v) => !v)} className={secondaryButtonClass}>
+                <CalendarPlus size={13} /> Replicar para os próximos meses
+              </button>
+            )}
+            {canCreateBill &&
+              (existingBill ? (
+                <Badge className="border border-amber-200 bg-amber-50 text-amber-700">Já lançada este mês</Badge>
+              ) : (
+                <button onClick={openBillDraft} className={secondaryButtonClass}>
+                  <Receipt size={13} /> Lançar como conta a pagar
+                </button>
+              ))}
+          </div>
         </div>
+
+        {replicateOpen && (
+          <div className="flex items-center gap-2 rounded-lg border border-dashed border-slate-300 p-2.5">
+            <span className="text-xs text-slate-500">Replicar {txs.length} lançamento{txs.length !== 1 ? "s" : ""} por quantos meses?</span>
+            <input
+              type="number"
+              min="1"
+              max="60"
+              step="1"
+              value={replicateMonths}
+              onChange={(e) => setReplicateMonths(e.target.value)}
+              className={`${inputClass} !w-16`}
+            />
+            <button onClick={handleReplicate} disabled={isReplicating} className={secondaryButtonClass + " disabled:opacity-60"}>
+              {isReplicating ? "Replicando..." : "Confirmar"}
+            </button>
+          </div>
+        )}
+
+        {successMessage && <p className="text-xs font-medium text-emerald-600">{successMessage}</p>}
 
         {txs.length === 0 ? (
           <EmptyState title="Nenhum lançamento" />
@@ -112,7 +235,7 @@ function CategoryDetailModal({ category, transactions, categories, accounts, mon
         <BillModal
           isOpen={!!billDraft}
           onClose={() => setBillDraft(null)}
-          onSubmit={onCreateBill}
+          onSubmit={handleCreateBill}
           categories={categories}
           accounts={accounts}
           initial={billDraft}
@@ -134,11 +257,12 @@ export function TransactionsTab({
   bills,
   onCloseFatura,
   onCreateBill,
+  onReplicate,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedCardAccount, setSelectedCardAccount] = useState(null);
-  const [selectedCategoryKey, setSelectedCategoryKey] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null); // { kind: "fixed" | "variable", key }
   const [fixedFilter, setFixedFilter] = useState("all"); // "all" | "fixed" | "variable"
 
   const monthTxAll = transactionsInMonth(transactions, monthKey);
@@ -154,21 +278,13 @@ export function TransactionsTab({
     .map((a) => ({ account: a, total: sumByType(monthTx.filter((t) => t.accountId === a.id), "expense") }))
     .filter((g) => g.total > 0);
 
-  const categoryGroupsMap = new Map();
-  for (const t of otherTx) {
-    const key = t.categoryId || "none";
-    if (!categoryGroupsMap.has(key)) categoryGroupsMap.set(key, []);
-    categoryGroupsMap.get(key).push(t);
-  }
-  const categoryGroups = [...categoryGroupsMap.entries()]
-    .map(([key, txs]) => ({
-      key,
-      category: key === "none" ? null : categories.find((c) => c.id === key),
-      txs,
-      total: txs.reduce((sum, t) => sum + (t.type === "income" ? t.amount : -t.amount), 0),
-    }))
-    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-  const selectedCategoryGroup = categoryGroups.find((g) => g.key === selectedCategoryKey) ?? null;
+  const fixedTx = otherTx.filter((t) => t.isFixed);
+  const variableTx = otherTx.filter((t) => !t.isFixed);
+  const fixedCategoryGroups = groupTransactionsByCategory(fixedTx, categories);
+  const variableCategoryGroups = groupTransactionsByCategory(variableTx, categories);
+  const selectedCategoryGroup = selectedGroup
+    ? (selectedGroup.kind === "fixed" ? fixedCategoryGroups : variableCategoryGroups).find((g) => g.key === selectedGroup.key) ?? null
+    : null;
 
   function openCreate(type) {
     setEditing({ __new: true, ...emptyForm(type) });
@@ -243,47 +359,32 @@ export function TransactionsTab({
         </Card>
       )}
 
-      <Card>
-        {monthTxAll.length === 0 ? (
+      {monthTxAll.length === 0 ? (
+        <Card>
           <EmptyState title="Nenhum lançamento neste mês" description="Adicione uma receita ou despesa para começar." />
-        ) : monthTx.length === 0 ? (
+        </Card>
+      ) : monthTx.length === 0 ? (
+        <Card>
           <EmptyState title="Nenhum lançamento com esse filtro" description="Troque para 'Todas' pra ver os lançamentos do mês." />
-        ) : otherTx.length === 0 ? (
+        </Card>
+      ) : otherTx.length === 0 ? (
+        <Card>
           <EmptyState title="Só lançamentos de cartão neste mês" description="Veja os detalhes acima, em Cartões." />
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {categoryGroups.map(({ key, category, txs, total }) => {
-              const preset = colorPreset(category?.colorId);
-              return (
-                <li key={key}>
-                  <button
-                    onClick={() => setSelectedCategoryKey(key)}
-                    className="flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm hover:bg-slate-50"
-                  >
-                    <div className="flex min-w-0 items-center gap-2.5">
-                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${preset.chip}`}>
-                        <Tag size={15} />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate font-medium text-slate-800">{category?.name ?? "Sem categoria"}</p>
-                        <p className="text-xs text-slate-400">
-                          {txs.length} lançamento{txs.length !== 1 ? "s" : ""}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <span className={`font-medium ${total >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                        {formatCurrency(total)}
-                      </span>
-                      <ChevronRight size={15} className="text-slate-300" />
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <>
+          <CategoryGroupsCard
+            title="Despesa Fixa"
+            groups={fixedCategoryGroups}
+            onSelect={(key) => setSelectedGroup({ kind: "fixed", key })}
+          />
+          <CategoryGroupsCard
+            title="Despesa Variável"
+            groups={variableCategoryGroups}
+            onSelect={(key) => setSelectedGroup({ kind: "variable", key })}
+          />
+        </>
+      )}
 
       <TransactionModal
         isOpen={modalOpen}
@@ -315,10 +416,12 @@ export function TransactionsTab({
         accounts={accounts}
         monthKey={monthKey}
         isOpen={!!selectedCategoryGroup}
-        onClose={() => setSelectedCategoryKey(null)}
+        onClose={() => setSelectedGroup(null)}
         onUpdate={onUpdate}
         onDelete={onDelete}
         onCreateBill={onCreateBill}
+        bills={bills}
+        onReplicate={onReplicate}
       />
     </div>
   );

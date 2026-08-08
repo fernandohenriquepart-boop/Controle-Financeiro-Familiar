@@ -179,6 +179,49 @@ export async function createRecurringTransaction(
   return series;
 }
 
+/**
+ * Replica cada lançamento do grupo (ex: todos os lançamentos de uma categoria
+ * num mês) para os `months` meses seguintes: uma recurring_series por
+ * lançamento, começando no mês seguinte ao da data original — o mês atual
+ * não é duplicado, só os futuros.
+ */
+export async function replicateTransactionsToFutureMonths(transactions, months, householdId) {
+  const createdSeries = [];
+  for (const t of transactions) {
+    const original = new Date(t.date + "T00:00:00");
+    const startDate = monthlyDates(original, 2)[1];
+    const schedule = buildRecurringSchedule({ startDate, count: months, amount: t.amount });
+    const series = await insertSeriesRow(
+      {
+        kind: "recurring",
+        type: t.type,
+        description: t.description,
+        categoryId: t.categoryId,
+        accountId: t.accountId,
+        installmentAmount: t.amount,
+        installmentCount: months,
+        installmentsGenerated: months,
+        startDate: startDate.toISOString().slice(0, 10),
+      },
+      householdId
+    );
+    const newTransactions = schedule.map((s) => ({
+      type: t.type,
+      accountId: t.accountId,
+      categoryId: t.categoryId,
+      amount: s.amount,
+      description: t.description,
+      date: s.date.toISOString().slice(0, 10),
+      isRecurring: true,
+      seriesId: series.id,
+      isFixed: t.isFixed ?? false,
+    }));
+    await insertTransactionsBulk(newTransactions, householdId);
+    createdSeries.push(series);
+  }
+  return createdSeries;
+}
+
 export async function deleteSeries(id) {
   // Cascade no banco (transactions.series_id on delete cascade) remove as parcelas junto.
   const { error } = await supabase.from("recurring_series").delete().eq("id", id);
