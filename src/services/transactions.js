@@ -19,7 +19,7 @@ function mapFromDb(row) {
 
 function mapToDb(transaction, householdId) {
   return {
-    id: transaction.id,
+    ...(transaction.id ? { id: transaction.id } : {}),
     household_id: householdId,
     account_id: transaction.accountId || null,
     category_id: transaction.categoryId || null,
