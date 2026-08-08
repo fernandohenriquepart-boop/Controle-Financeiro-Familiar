@@ -57,18 +57,34 @@ export function ImportFaturaModal({ isOpen, onClose, cardAccounts, categories, t
       setError(result.error || "Não encontrei nenhum lançamento nessa fatura.");
       return;
     }
+    if (!result.vencimentoDate) {
+      setError("Não encontrei a data de vencimento dessa fatura.");
+      return;
+    }
     setBankLabel(result.bankLabel);
+    // A data que fica salva é a do vencimento da fatura (mesmo mês que a
+    // "Nova compra" manual já usa), não a data exata da compra — assim o
+    // lançamento aparece no mês em que a fatura realmente cai, não no mês em
+    // que a compra foi feita. A data de compra fica só como referência.
+    const vencimento = toDateInputValue(result.vencimentoDate);
     setRows(
-      result.transactions.map((t, i) => ({
-        id: i,
-        included: !isDuplicate(t, accountId, transactions),
-        duplicate: isDuplicate(t, accountId, transactions),
-        date: toDateInputValue(t.date),
-        description: t.description,
-        amount: String(t.amount),
-        categoryId: guessCategoryId(t.category, categories),
-        installment: t.installment,
-      }))
+      result.transactions.map((t, i) => {
+        // Compara pela data da fatura (não pela data de compra) — reimportar
+        // a mesma fatura duas vezes deve gerar a mesma data de vencimento
+        // sempre, então é isso que detecta a duplicata de forma confiável.
+        const duplicate = isDuplicate({ date: vencimento, amount: t.amount }, accountId, transactions);
+        return {
+          id: i,
+          included: !duplicate,
+          duplicate,
+          date: vencimento,
+          purchaseDate: toDateInputValue(t.date),
+          description: t.description,
+          amount: String(t.amount),
+          categoryId: guessCategoryId(t.category, categories),
+          installment: t.installment,
+        };
+      })
     );
   }
 
@@ -210,12 +226,17 @@ export function ImportFaturaModal({ isOpen, onClose, cardAccounts, categories, t
               Banco identificado: <strong>{bankLabel}</strong> · {rows.length} lançamento{rows.length !== 1 ? "s" : ""} encontrado
               {rows.length !== 1 ? "s" : ""}, {includedCount} selecionado{includedCount !== 1 ? "s" : ""}
             </p>
+            <p className="text-xs text-slate-400">
+              Todos os lançamentos entram no mês de vencimento desta fatura
+              {rows[0] ? ` (${new Date(rows[0].date + "T00:00:00").toLocaleDateString("pt-BR")})` : ""} — a data de compra
+              original aparece só como referência abaixo da descrição.
+            </p>
             <div className="max-h-96 overflow-y-auto rounded-lg border border-slate-200">
               <table className="w-full text-xs">
                 <thead className="sticky top-0 bg-slate-50 text-left text-slate-500">
                   <tr>
                     <th className="p-2"></th>
-                    <th className="p-2">Data</th>
+                    <th className="p-2">Data (fatura)</th>
                     <th className="p-2">Descrição</th>
                     <th className="p-2">Valor</th>
                     <th className="p-2">Categoria</th>
@@ -247,7 +268,10 @@ export function ImportFaturaModal({ isOpen, onClose, cardAccounts, categories, t
                           onChange={(e) => updateRow(row.id, { description: e.target.value })}
                           className={`${inputClass} w-full !py-1`}
                         />
-                        <div className="mt-1 flex gap-1">
+                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                          <span className="text-[11px] text-slate-400">
+                            compra em {new Date(row.purchaseDate + "T00:00:00").toLocaleDateString("pt-BR")}
+                          </span>
                           {row.installment && (
                             <Badge className="border border-violet-200 bg-violet-50 text-violet-700">
                               {row.installment.current}/{row.installment.total} parcelas
