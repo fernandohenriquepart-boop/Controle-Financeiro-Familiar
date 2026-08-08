@@ -460,6 +460,8 @@ export default function App() {
               onCreateRecurring={createRecurringTransaction}
               onUpdate={editTransaction}
               onDelete={removeTransaction}
+              bills={bills}
+              onCloseFatura={createBill}
             />
           ) : tab === "cards" ? (
             <CardsTab
@@ -467,12 +469,14 @@ export default function App() {
               transactions={transactions}
               categories={categories}
               series={series}
+              bills={bills}
               onCreatePurchase={createCardPurchase}
               onDeleteSeries={removeSeries}
               onImportFatura={importFaturaTransactions}
               onUpdateTransaction={editTransaction}
               onDeleteTransaction={removeTransaction}
               onCreateCashExpense={createTransaction}
+              onCloseFatura={createBill}
             />
           ) : tab === "budgets" ? (
             <BudgetsTab categories={categories} budgets={budgets} transactions={transactions} monthKey={monthKey} onSetBudget={setBudget} />

@@ -144,7 +144,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
   const expense = sumByType(monthTx, "expense");
   const fixedExpense = monthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
   const variableExpense = expense - fixedExpense;
-  const balance = totalBalance(accounts, transactions);
+  const balance = totalBalance(accounts, transactions, bills);
   const expenseByCategory = categoryTotals(monthTx, categories, "expense");
   const pendingBills = upcomingBills(bills, { days: 15 });
 

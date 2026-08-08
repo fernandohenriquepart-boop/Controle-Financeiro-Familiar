@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
-import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
+import { Card, Modal, Field, EmptyState, Badge, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
 import { ImportFaturaModal } from "./ImportFaturaModal";
 import { MonthSwitcher } from "./DashboardComponents";
 import { TransactionModal } from "./TransactionModal";
@@ -335,9 +335,12 @@ export function CardDetailModal({
   initialMonthKey,
   onUpdate,
   onDelete,
+  bills,
+  onCloseFatura,
 }) {
   const [monthKey, setMonthKey] = useState(initialMonthKey ?? currentMonthKey());
   const [editing, setEditing] = useState(null);
+  const [isClosingFatura, setIsClosingFatura] = useState(false);
 
   useMemo(() => {
     if (isOpen) setMonthKey(initialMonthKey ?? currentMonthKey());
@@ -350,10 +353,31 @@ export function CardDetailModal({
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const faturaTotal = sumByType(monthTx, "expense");
   const canEdit = Boolean(onUpdate && onDelete && accounts);
+  const canCloseFatura = Boolean(onCloseFatura && bills);
+  const closedBill = bills?.find((b) => b.accountId === account.id && b.dueDate?.slice(0, 7) === monthKey.slice(0, 7));
 
   async function handleEditSubmit(form) {
     const { __id, ...payload } = form;
     await onUpdate(__id, payload);
+  }
+
+  async function handleCloseFatura() {
+    const [year, month] = monthKey.split("-").map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    const day = Math.min(account.dueDay ?? 1, lastDay);
+    const dueDate = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    setIsClosingFatura(true);
+    try {
+      await onCloseFatura({
+        type: "payable",
+        description: `Fatura ${account.name} — ${formatMonthLabel(monthKey)}`,
+        amount: faturaTotal,
+        dueDate,
+        accountId: account.id,
+      });
+    } finally {
+      setIsClosingFatura(false);
+    }
   }
 
   return (
@@ -365,6 +389,28 @@ export function CardDetailModal({
           </p>
           <MonthSwitcher monthKey={monthKey} onChange={(delta) => setMonthKey((m) => shiftMonthKey(m, delta))} />
         </div>
+
+        {canCloseFatura && (
+          <div className="flex items-center justify-between rounded-lg border border-dashed border-slate-300 p-2.5">
+            {closedBill ? (
+              <Badge className={closedBill.status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
+                Fatura fechada — {closedBill.status === "paid" ? "paga" : "em aberto"} · vence{" "}
+                {new Date(closedBill.dueDate + "T00:00:00").toLocaleDateString("pt-BR")}
+              </Badge>
+            ) : (
+              <>
+                <span className="text-xs text-slate-500">Fatura ainda não fechada como conta a pagar.</span>
+                <button
+                  onClick={handleCloseFatura}
+                  disabled={isClosingFatura || faturaTotal <= 0}
+                  className={secondaryButtonClass + " disabled:opacity-60"}
+                >
+                  {isClosingFatura ? "Fechando..." : "Fechar fatura"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {monthTx.length === 0 ? (
           <EmptyState title="Nenhum lançamento neste mês" />
@@ -496,12 +542,14 @@ export function CardsTab({
   transactions,
   categories,
   series,
+  bills,
   onCreatePurchase,
   onDeleteSeries,
   onImportFatura,
   onUpdateTransaction,
   onDeleteTransaction,
   onCreateCashExpense,
+  onCloseFatura,
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [cashModalOpen, setCashModalOpen] = useState(false);
@@ -606,6 +654,8 @@ export function CardsTab({
         onClose={() => setSelectedAccount(null)}
         onUpdate={onUpdateTransaction}
         onDelete={onDeleteTransaction}
+        bills={bills}
+        onCloseFatura={onCloseFatura}
       />
     </div>
   );

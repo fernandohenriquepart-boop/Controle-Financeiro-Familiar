@@ -81,7 +81,18 @@ function CategoryDetailModal({ category, transactions, categories, accounts, isO
   );
 }
 
-export function TransactionsTab({ transactions, categories, accounts, monthKey, onCreate, onCreateRecurring, onUpdate, onDelete }) {
+export function TransactionsTab({
+  transactions,
+  categories,
+  accounts,
+  monthKey,
+  onCreate,
+  onCreateRecurring,
+  onUpdate,
+  onDelete,
+  bills,
+  onCloseFatura,
+}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [selectedCardAccount, setSelectedCardAccount] = useState(null);
@@ -251,6 +262,8 @@ export function TransactionsTab({ transactions, categories, accounts, monthKey, 
         initialMonthKey={monthKey}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        bills={bills}
+        onCloseFatura={onCloseFatura}
       />
 
       <CategoryDetailModal

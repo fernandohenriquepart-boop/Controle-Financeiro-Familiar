@@ -109,10 +109,14 @@ export function accountBalance(account, transactions) {
   return account.initialBalance + delta;
 }
 
-export function totalBalance(accounts, transactions) {
-  return accounts
+export function totalBalance(accounts, transactions, bills = []) {
+  const accountsTotal = accounts
     .filter((a) => a.type !== "cartao_credito")
     .reduce((sum, a) => sum + accountBalance(a, transactions), 0);
+  const pendingPayables = bills
+    .filter((b) => b.type === "payable" && b.status === "pending")
+    .reduce((sum, b) => sum + b.amount, 0);
+  return accountsTotal - pendingPayables;
 }
 
 export function categoryTotals(transactions, categories, type) {
