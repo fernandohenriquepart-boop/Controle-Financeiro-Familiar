@@ -1,9 +1,11 @@
 import { detectNubank, parse as parseNubank } from "./nubank.js";
 import { detectItau, parse as parseItau } from "./itau.js";
+import { detectBB, parse as parseBB } from "./bb.js";
 
 const BANKS = [
   { id: "nubank", label: "Nubank", detect: detectNubank, parse: parseNubank },
   { id: "itau", label: "Itaú", detect: detectItau, parse: parseItau },
+  { id: "bb", label: "Banco do Brasil", detect: detectBB, parse: parseBB },
 ];
 
 export function detectBank(rawText) {
