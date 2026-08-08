@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
-import { Plus, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
 import { ImportFaturaModal } from "./ImportFaturaModal";
 import { MonthSwitcher } from "./DashboardComponents";
+import { TransactionModal } from "./TransactionModal";
 import {
   formatCurrency,
   formatMonthLabel,
@@ -11,6 +12,7 @@ import {
   sumByType,
   currentMonthKey,
   shiftMonthKey,
+  buildEditPayload,
 } from "../domain";
 
 const CARD_CHART_COLORS = ["#7c3aed", "#0891b2", "#db2777", "#059669", "#d97706", "#dc2626", "#2563eb", "#65a30d"];
@@ -180,8 +182,19 @@ function CardSummary({ account, transactions, onSelect }) {
   );
 }
 
-export function CardDetailModal({ account, transactions, categories, isOpen, onClose, initialMonthKey }) {
+export function CardDetailModal({
+  account,
+  transactions,
+  categories,
+  accounts,
+  isOpen,
+  onClose,
+  initialMonthKey,
+  onUpdate,
+  onDelete,
+}) {
   const [monthKey, setMonthKey] = useState(initialMonthKey ?? currentMonthKey());
+  const [editing, setEditing] = useState(null);
 
   useMemo(() => {
     if (isOpen) setMonthKey(initialMonthKey ?? currentMonthKey());
@@ -193,6 +206,12 @@ export function CardDetailModal({ account, transactions, categories, isOpen, onC
     .filter((t) => t.accountId === account.id)
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   const faturaTotal = sumByType(monthTx, "expense");
+  const canEdit = Boolean(onUpdate && onDelete && accounts);
+
+  async function handleEditSubmit(form) {
+    const { __id, ...payload } = form;
+    await onUpdate(__id, payload);
+  }
 
   return (
     <Modal title={account.name} isOpen={isOpen} onClose={onClose} wide>
@@ -219,13 +238,42 @@ export function CardDetailModal({ account, transactions, categories, isOpen, onC
                       {category ? ` · ${category.name}` : ""}
                     </p>
                   </div>
-                  <span className="shrink-0 font-medium text-rose-600">{formatCurrency(t.amount)}</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-medium text-rose-600">{formatCurrency(t.amount)}</span>
+                    {canEdit && (
+                      <>
+                        <button
+                          onClick={() => setEditing(buildEditPayload(t))}
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => onDelete(t.id)}
+                          className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
       </div>
+
+      {canEdit && (
+        <TransactionModal
+          isOpen={!!editing}
+          onClose={() => setEditing(null)}
+          onSubmit={handleEditSubmit}
+          categories={categories}
+          accounts={accounts}
+          initial={editing}
+        />
+      )}
     </Modal>
   );
 }
@@ -300,7 +348,17 @@ function CardsMonthlyChart({ accounts, transactions }) {
   );
 }
 
-export function CardsTab({ accounts, transactions, categories, series, onCreatePurchase, onDeleteSeries, onImportFatura }) {
+export function CardsTab({
+  accounts,
+  transactions,
+  categories,
+  series,
+  onCreatePurchase,
+  onDeleteSeries,
+  onImportFatura,
+  onUpdateTransaction,
+  onDeleteTransaction,
+}) {
   const [modalOpen, setModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
@@ -383,8 +441,11 @@ export function CardsTab({ accounts, transactions, categories, series, onCreateP
         account={selectedAccount}
         transactions={transactions}
         categories={categories}
+        accounts={accounts}
         isOpen={!!selectedAccount}
         onClose={() => setSelectedAccount(null)}
+        onUpdate={onUpdateTransaction}
+        onDelete={onDeleteTransaction}
       />
     </div>
   );

@@ -64,6 +64,29 @@ export function toDateInputValue(date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+export function emptyTransactionForm(type = "expense") {
+  return {
+    type,
+    amount: "",
+    description: "",
+    date: new Date().toISOString().slice(0, 10),
+    categoryId: "",
+    accountId: "",
+  };
+}
+
+export function buildEditPayload(transaction) {
+  return {
+    type: transaction.type,
+    amount: String(transaction.amount),
+    description: transaction.description,
+    date: transaction.date,
+    categoryId: transaction.categoryId ?? "",
+    accountId: transaction.accountId ?? "",
+    __id: transaction.id,
+  };
+}
+
 export function shiftMonthKey(monthKey, delta) {
   const [y, m] = monthKey.split("-").map(Number);
   const d = new Date(y, m - 1 + delta, 1);

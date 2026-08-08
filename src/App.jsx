@@ -458,6 +458,8 @@ export default function App() {
               onCreatePurchase={createCardPurchase}
               onDeleteSeries={removeSeries}
               onImportFatura={importFaturaTransactions}
+              onUpdateTransaction={editTransaction}
+              onDeleteTransaction={removeTransaction}
             />
           ) : tab === "budgets" ? (
             <BudgetsTab categories={categories} budgets={budgets} transactions={transactions} monthKey={monthKey} onSetBudget={setBudget} />
