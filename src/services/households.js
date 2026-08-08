@@ -3,7 +3,14 @@ import { supabase } from "./supabaseClient";
 export async function fetchHousehold(householdId) {
   const { data, error } = await supabase.from("households").select("*").eq("id", householdId).single();
   if (error) throw error;
-  return { id: data.id, name: data.name, ownerId: data.owner_id, createdAt: data.created_at };
+  return { id: data.id, name: data.name, ownerId: data.owner_id, joinCode: data.join_code, createdAt: data.created_at };
+}
+
+/** Resolve um código de família pro id dela — usado na tela de criar conta, antes de haver sessão. */
+export async function resolveJoinCode(code) {
+  const { data, error } = await supabase.rpc("household_id_for_join_code", { p_code: code });
+  if (error) throw error;
+  return data;
 }
 
 export async function updateHouseholdName(householdId, name) {

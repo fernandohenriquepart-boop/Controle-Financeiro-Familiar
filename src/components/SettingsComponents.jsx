@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, UserPlus, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, UserPlus, Check, Copy } from "lucide-react";
 import { Card, Modal, Field, EmptyState, Avatar, Badge, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
 import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset } from "../domain";
 
@@ -9,6 +9,7 @@ function HouseholdNameCard({ household, isAdmin, onUpdateName }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(household?.name ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   async function handleSave() {
     setIsSubmitting(true);
@@ -20,31 +21,50 @@ function HouseholdNameCard({ household, isAdmin, onUpdateName }) {
     }
   }
 
+  async function handleCopyCode() {
+    await navigator.clipboard.writeText(household?.joinCode ?? "");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
-    <Card className="flex items-center justify-between gap-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-slate-500">Nome da família</p>
-        {editing ? (
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={`${inputClass} mt-1 w-full`}
-            autoFocus
-          />
-        ) : (
-          <p className="truncate text-sm font-semibold text-slate-800">{household?.name}</p>
-        )}
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs text-slate-500">Nome da família</p>
+          {editing ? (
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={`${inputClass} mt-1 w-full`}
+              autoFocus
+            />
+          ) : (
+            <p className="truncate text-sm font-semibold text-slate-800">{household?.name}</p>
+          )}
+        </div>
+        {isAdmin &&
+          (editing ? (
+            <button onClick={handleSave} disabled={isSubmitting} className={primaryButtonClass + " !px-3 !py-1.5 text-xs"}>
+              <Check size={13} /> Salvar
+            </button>
+          ) : (
+            <button onClick={() => setEditing(true)} className={secondaryButtonClass}>
+              <Pencil size={12} /> Editar
+            </button>
+          ))}
       </div>
-      {isAdmin &&
-        (editing ? (
-          <button onClick={handleSave} disabled={isSubmitting} className={primaryButtonClass + " !px-3 !py-1.5 text-xs"}>
-            <Check size={13} /> Salvar
-          </button>
-        ) : (
-          <button onClick={() => setEditing(true)} className={secondaryButtonClass}>
-            <Pencil size={12} /> Editar
-          </button>
-        ))}
+
+      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+        <div className="min-w-0">
+          <p className="text-xs text-slate-500">Código da família</p>
+          <p className="truncate font-mono text-sm font-semibold text-slate-800">{household?.joinCode}</p>
+          <p className="text-[11px] text-slate-400">Compartilhe pra alguém entrar na família na tela de criar conta.</p>
+        </div>
+        <button onClick={handleCopyCode} className={secondaryButtonClass}>
+          {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copiado" : "Copiar"}
+        </button>
+      </div>
     </Card>
   );
 }

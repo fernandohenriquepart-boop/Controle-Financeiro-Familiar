@@ -2,6 +2,7 @@ import { useState } from "react";
 import { LogIn, UserPlus, Wallet } from "lucide-react";
 import { inputClass, primaryButtonClass, Field } from "./ui";
 import { signIn, signUp } from "../services/auth";
+import { resolveJoinCode } from "../services/households";
 
 // Tela de login / cadastro — porta de entrada antes de qualquer dado carregar.
 // ---------------------------------------------------------------------------
@@ -11,6 +12,7 @@ export function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [householdCode, setHouseholdCode] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,8 +27,22 @@ export function LoginScreen() {
         await signIn(email, password);
         // sucesso: onAuthStateChange (em App.jsx) detecta a sessão e troca a tela sozinho
       } else {
-        await signUp(email, password, fullName);
-        setInfo("Conta criada. Se a confirmação por e-mail estiver ativa, verifique sua caixa de entrada antes de entrar.");
+        let invitedHouseholdId;
+        const code = householdCode.trim();
+        if (code) {
+          invitedHouseholdId = await resolveJoinCode(code);
+          if (!invitedHouseholdId) {
+            setError("Código da família não encontrado. Confira com quem te enviou o código.");
+            setIsSubmitting(false);
+            return;
+          }
+        }
+        await signUp(email, password, fullName, invitedHouseholdId);
+        setInfo(
+          invitedHouseholdId
+            ? "Conta criada e já ligada à família. Se pedir confirmação por e-mail, verifique sua caixa de entrada antes de entrar."
+            : "Conta criada. Se a confirmação por e-mail estiver ativa, verifique sua caixa de entrada antes de entrar."
+        );
       }
     } catch (err) {
       setError(err.message || "Não foi possível concluir. Tente novamente.");
@@ -46,22 +62,33 @@ export function LoginScreen() {
           <p className="text-xs text-slate-400">
             {mode === "signin"
               ? "Entre com sua conta para continuar."
-              : "Crie sua conta — isso cria uma nova família, você pode convidar os outros depois."}
+              : "Sem código, cria uma família nova. Com o código de alguém da família, você entra direto na dela."}
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {mode === "signup" && (
-            <Field label="Seu nome">
-              <input
-                type="text"
-                required
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className={`${inputClass} w-full`}
-                placeholder="Seu nome"
-              />
-            </Field>
+            <>
+              <Field label="Seu nome">
+                <input
+                  type="text"
+                  required
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  className={`${inputClass} w-full`}
+                  placeholder="Seu nome"
+                />
+              </Field>
+              <Field label="Código da família (opcional)">
+                <input
+                  type="text"
+                  value={householdCode}
+                  onChange={(e) => setHouseholdCode(e.target.value)}
+                  className={`${inputClass} w-full`}
+                  placeholder="Deixe em branco pra criar uma família nova"
+                />
+              </Field>
+            </>
           )}
           <Field label="E-mail">
             <input
