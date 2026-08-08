@@ -62,7 +62,10 @@ export function DesktopSidebar({ tabs, activeTab, onSelect, household, profile, 
 
 export function MobileTopBar({ household, onOpenDrawer }) {
   return (
-    <header className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 md:hidden">
+    <header
+      className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 md:hidden"
+      style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}
+    >
       <button
         onClick={onOpenDrawer}
         aria-label="Abrir menu"
@@ -109,7 +112,10 @@ export function MobileNavDrawer({ isOpen, onClose, tabs, activeTab, onSelect, ho
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5">
+        <div
+          className="flex items-center justify-between border-b border-slate-200 px-4 py-3.5"
+          style={{ paddingTop: "max(0.875rem, env(safe-area-inset-top))" }}
+        >
           <span className="truncate text-sm font-semibold text-slate-900">{household?.name}</span>
           <button
             onClick={onClose}
