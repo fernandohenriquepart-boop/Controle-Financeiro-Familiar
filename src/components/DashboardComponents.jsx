@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Scale, AlertTriangle, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Wallet, Scale, AlertTriangle, Pencil, Trash2, CreditCard } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Modal, EmptyState, Badge } from "./ui";
 import { TransactionModal } from "./TransactionModal";
@@ -43,7 +43,7 @@ function SummaryCard({ icon: Icon, label, value, tone, subtitle, onClick }) {
   return <Card className="flex items-center gap-3">{content}</Card>;
 }
 
-function MonthExpensesModal({ isOpen, onClose, transactions, categories, accounts, monthLabel, total, onUpdate, onDelete }) {
+function MonthExpensesModal({ isOpen, onClose, transactions, cardTotals, categories, accounts, monthLabel, total, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(null);
   const sorted = [...transactions].sort((a, b) => (a.date < b.date ? 1 : -1));
 
@@ -59,9 +59,28 @@ function MonthExpensesModal({ isOpen, onClose, transactions, categories, account
           Total: <span className="font-semibold text-rose-600">{formatCurrency(total)}</span>
         </p>
 
-        {sorted.length === 0 ? (
+        {cardTotals && cardTotals.length > 0 && (
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+            {cardTotals.map(({ account, total: cardTotal }) => (
+              <li key={account.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-50 text-violet-600">
+                    <CreditCard size={15} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-800">{account.name}</p>
+                    <p className="truncate text-xs text-slate-400">Veja os lançamentos em Lançamentos Cartões</p>
+                  </div>
+                </div>
+                <span className="shrink-0 font-medium text-rose-600">{formatCurrency(cardTotal)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {sorted.length === 0 && (!cardTotals || cardTotals.length === 0) ? (
           <EmptyState title="Nenhuma despesa neste mês" />
-        ) : (
+        ) : sorted.length === 0 ? null : (
           <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
             {sorted.map((t) => {
               const category = categories.find((c) => c.id === t.categoryId);
@@ -140,12 +159,24 @@ export function MonthSwitcher({ monthKey, onChange }) {
 export function DashboardTab({ accounts, transactions, categories, bills, monthKey, onUpdate, onDelete }) {
   const [expensesModalOpen, setExpensesModalOpen] = useState(false);
   const monthTx = transactionsInMonth(transactions, monthKey);
-  const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
+  const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
+  const cardAccountIds = new Set(cardAccounts.map((a) => a.id));
   const nonCardMonthTx = monthTx.filter((t) => !cardAccountIds.has(t.accountId));
+  const cardTotals = cardAccounts
+    .map((account) => ({
+      account,
+      total: sumByType(
+        monthTx.filter((t) => t.accountId === account.id),
+        "expense"
+      ),
+    }))
+    .filter((c) => c.total > 0);
+  const cardExpenseTotal = cardTotals.reduce((sum, c) => sum + c.total, 0);
   const income = sumByType(monthTx, "income");
-  const expense = sumByType(nonCardMonthTx, "expense");
+  const nonCardExpense = sumByType(nonCardMonthTx, "expense");
+  const expense = nonCardExpense + cardExpenseTotal;
   const fixedExpense = nonCardMonthTx.filter((t) => t.type === "expense" && t.isFixed).reduce((sum, t) => sum + t.amount, 0);
-  const variableExpense = expense - fixedExpense;
+  const variableExpense = nonCardExpense - fixedExpense;
   const result = income - expense;
   const balance = totalBalance(accounts, transactions, bills);
   const expenseByCategory = categoryTotals(nonCardMonthTx, categories, "expense");
@@ -167,7 +198,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           label="Despesas do mês"
           value={formatCurrency(expense)}
           tone="bg-rose-50 text-rose-600"
-          subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)} · sem cartão`}
+          subtitle={`Fixas: ${formatCurrency(fixedExpense)} · Variáveis: ${formatCurrency(variableExpense)} · Cartões: ${formatCurrency(cardExpenseTotal)}`}
           onClick={() => setExpensesModalOpen(true)}
         />
         <SummaryCard
@@ -267,6 +298,7 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
         isOpen={expensesModalOpen}
         onClose={() => setExpensesModalOpen(false)}
         transactions={nonCardMonthTx.filter((t) => t.type === "expense")}
+        cardTotals={cardTotals}
         categories={categories}
         accounts={accounts}
         monthLabel={formatMonthLabel(monthKey)}
