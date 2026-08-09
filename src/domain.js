@@ -167,3 +167,18 @@ export function isOverdue(bill) {
 export function goalProgress(goal) {
   return goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0;
 }
+
+export function trialDaysLeft(household) {
+  if (!household?.trialEndsAt) return null;
+  return Math.ceil((new Date(household.trialEndsAt) - new Date()) / 86400000);
+}
+
+export function isAccessBlocked(household) {
+  if (!household) return false;
+  if (household.planStatus === "canceled") return true;
+  if (household.planStatus === "trialing") {
+    const daysLeft = trialDaysLeft(household);
+    return daysLeft !== null && daysLeft < 0;
+  }
+  return false;
+}

@@ -1,9 +1,97 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserPlus, Check, Copy } from "lucide-react";
 import { Card, Modal, Field, EmptyState, Avatar, Badge, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
-import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset, formatCurrency } from "../domain";
+import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset, formatCurrency, trialDaysLeft } from "../domain";
 import { findDuplicateGroups } from "../lib/duplicates";
 import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from "../services/push";
+import { createAsaasSubscription } from "../services/billing";
+
+// --- Assinatura ------------------------------------------------------------
+
+const PLAN_STATUS_LABELS = {
+  trialing: "Em teste grátis",
+  active: "Assinatura ativa",
+  past_due: "Pagamento atrasado",
+  canceled: "Assinatura cancelada",
+};
+
+export function SubscriptionCard({ household, isAdmin }) {
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const status = household?.planStatus ?? "trialing";
+  const daysLeft = trialDaysLeft(household);
+  const needsAction = status !== "active";
+
+  async function handleSubscribe(e) {
+    e.preventDefault();
+    setError("");
+    if (!cpfCnpj.trim()) {
+      setError("Informe o CPF do responsável pela assinatura.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const { checkoutUrl } = await createAsaasSubscription({ cpfCnpj: cpfCnpj.trim() });
+      window.open(checkoutUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setError(err.message || "Não foi possível iniciar a assinatura.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-slate-800">Assinatura</p>
+          <p className="text-xs text-slate-500">
+            {PLAN_STATUS_LABELS[status] ?? status}
+            {status === "trialing" && daysLeft !== null && (daysLeft >= 0 ? ` · ${daysLeft} dia(s) restantes` : " · expirado")}
+          </p>
+        </div>
+        <Badge
+          className={
+            status === "active"
+              ? "bg-emerald-50 text-emerald-700"
+              : status === "past_due"
+                ? "bg-amber-50 text-amber-700"
+                : status === "canceled"
+                  ? "bg-rose-50 text-rose-700"
+                  : "bg-blue-50 text-blue-700"
+          }
+        >
+          {PLAN_STATUS_LABELS[status] ?? status}
+        </Badge>
+      </div>
+
+      {needsAction && isAdmin && (
+        <form onSubmit={handleSubscribe} className="flex flex-col gap-2 border-t border-slate-100 pt-3">
+          <Field label="CPF do responsável">
+            <input
+              type="text"
+              value={cpfCnpj}
+              onChange={(e) => setCpfCnpj(e.target.value)}
+              className={`${inputClass} w-full`}
+              placeholder="000.000.000-00"
+            />
+          </Field>
+          {error && <p className="text-xs text-rose-600">{error}</p>}
+          <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
+            {isSubmitting ? "Gerando link..." : "Assinar agora (R$ 19,90/mês)"}
+          </button>
+          <p className="text-[11px] text-slate-400">Abre uma página segura da Asaas pra escolher Pix, boleto ou cartão.</p>
+        </form>
+      )}
+      {needsAction && !isAdmin && (
+        <p className="border-t border-slate-100 pt-3 text-xs text-slate-400">
+          Só o administrador da família pode gerenciar a assinatura.
+        </p>
+      )}
+    </Card>
+  );
+}
 
 // --- Nome da família -------------------------------------------------------
 
@@ -620,6 +708,7 @@ export function SettingsTab({
   return (
     <div className="flex flex-col gap-4">
       <HouseholdNameCard household={household} isAdmin={isAdmin} onUpdateName={onUpdateHouseholdName} />
+      <SubscriptionCard household={household} isAdmin={isAdmin} />
       <PushRemindersCard household={household} profile={profile} />
       <MembersCard members={members} isAdmin={isAdmin} onInvite={onInvite} />
       <CategoriesCard categories={categories} onCreate={onCreateCategory} onUpdate={onUpdateCategory} onDelete={onDeleteCategory} />

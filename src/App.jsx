@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { LayoutDashboard, Receipt, PieChart, CalendarClock, Target, Settings, CreditCard, X } from "lucide-react";
-import { currentMonthKey, shiftMonthKey } from "./domain";
+import { currentMonthKey, shiftMonthKey, isAccessBlocked } from "./domain";
 import { getSession, onAuthStateChange, fetchProfile, signOut, inviteMember as inviteMemberApi } from "./services/auth";
 import * as householdsApi from "./services/households";
 import * as accountsApi from "./services/accounts";
@@ -18,7 +18,7 @@ import { BudgetsTab } from "./components/BudgetsComponents";
 import { BillsTab } from "./components/BillsComponents";
 import { GoalsTab } from "./components/GoalsComponents";
 import { CardsTab } from "./components/CardsComponents";
-import { SettingsTab } from "./components/SettingsComponents";
+import { SettingsTab, SubscriptionCard } from "./components/SettingsComponents";
 
 const TABS = [
   { id: "dashboard", label: "Painel", icon: LayoutDashboard },
@@ -441,6 +441,23 @@ export default function App() {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-sm text-slate-400">
         Carregando dados da família...
+      </div>
+    );
+  }
+
+  if (isAccessBlocked(household)) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-slate-50 p-6">
+        <div className="w-full max-w-sm">
+          <p className="mb-3 text-center text-sm font-medium text-slate-700">
+            {household.planStatus === "canceled" ? "Sua assinatura foi cancelada." : "Seu período de teste grátis acabou."}{" "}
+            Assine pra continuar usando o Controle Financeiro Familiar.
+          </p>
+          <SubscriptionCard household={household} isAdmin={profile.role === "admin"} />
+          <button onClick={signOut} className="mt-3 w-full text-center text-xs text-slate-400 hover:text-slate-600">
+            Sair
+          </button>
+        </div>
       </div>
     );
   }
