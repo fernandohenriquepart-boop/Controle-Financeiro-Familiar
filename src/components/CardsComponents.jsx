@@ -347,7 +347,17 @@ export function CardDetailModal({
   const [isClosingFatura, setIsClosingFatura] = useState(false);
 
   useMemo(() => {
-    if (isOpen) setMonthKey(initialMonthKey ?? currentMonthKey());
+    if (isOpen && account) {
+      const baseMonthKey = initialMonthKey ?? currentMonthKey();
+      const alreadyClosed = bills?.some(
+        (b) => b.accountId === account.id && b.dueDate?.slice(0, 7) === baseMonthKey.slice(0, 7)
+      );
+      // Se a fatura desse mês já foi fechada, os lançamentos novos já caem
+      // no mês seguinte — abre direto lá, em vez de mostrar um mês fechado
+      // sem nada novo pra ver.
+      setMonthKey(alreadyClosed ? shiftMonthKey(baseMonthKey, 1) : baseMonthKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só deve rodar ao abrir/trocar de mês, não a cada mudança em bills/account
   }, [isOpen, initialMonthKey]);
 
   if (!account) return null;
