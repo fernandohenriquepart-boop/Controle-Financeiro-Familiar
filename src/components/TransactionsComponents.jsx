@@ -254,6 +254,7 @@ export function TransactionsTab({
   onCreateRecurring,
   onUpdate,
   onDelete,
+  onDeleteSeries,
   bills,
   onCloseFatura,
   onCreateBill,
@@ -405,6 +406,7 @@ export function TransactionsTab({
         initialMonthKey={monthKey}
         onUpdate={onUpdate}
         onDelete={onDelete}
+        onDeleteSeries={onDeleteSeries}
         bills={bills}
         onCloseFatura={onCloseFatura}
       />

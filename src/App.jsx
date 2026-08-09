@@ -505,6 +505,7 @@ export default function App() {
               onCreateRecurring={createRecurringTransaction}
               onUpdate={editTransaction}
               onDelete={removeTransaction}
+              onDeleteSeries={removeSeries}
               bills={bills}
               onCloseFatura={createBill}
               onCreateBill={createBill}

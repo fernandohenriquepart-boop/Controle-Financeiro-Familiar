@@ -337,11 +337,13 @@ export function CardDetailModal({
   initialMonthKey,
   onUpdate,
   onDelete,
+  onDeleteSeries,
   bills,
   onCloseFatura,
 }) {
   const [monthKey, setMonthKey] = useState(initialMonthKey ?? currentMonthKey());
   const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [isClosingFatura, setIsClosingFatura] = useState(false);
 
   useMemo(() => {
@@ -361,6 +363,24 @@ export function CardDetailModal({
   async function handleEditSubmit(form, _recurring, applyScope) {
     const { __id, ...payload } = form;
     await onUpdate(__id, payload, applyScope);
+  }
+
+  function handleDeleteClick(t) {
+    if (t.seriesId && onDeleteSeries) {
+      setDeleteTarget(t);
+    } else {
+      onDelete(t.id);
+    }
+  }
+
+  async function handleDeleteOnlyThis() {
+    await onDelete(deleteTarget.id);
+    setDeleteTarget(null);
+  }
+
+  async function handleDeleteAllInstallments() {
+    await onDeleteSeries(deleteTarget.seriesId);
+    setDeleteTarget(null);
   }
 
   async function handleCloseFatura() {
@@ -440,7 +460,7 @@ export function CardDetailModal({
                           <Pencil size={14} />
                         </button>
                         <button
-                          onClick={() => onDelete(t.id)}
+                          onClick={() => handleDeleteClick(t)}
                           className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
                         >
                           <Trash2 size={14} />
@@ -465,6 +485,23 @@ export function CardDetailModal({
           initial={editing}
         />
       )}
+
+      <Modal title="Excluir lançamento parcelado" isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)}>
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-slate-600">
+            "{deleteTarget?.description || "Este lançamento"}" faz parte de uma compra parcelada. O que você quer excluir?
+          </p>
+          <button onClick={handleDeleteOnlyThis} className={secondaryButtonClass + " justify-center"}>
+            Excluir só esta parcela
+          </button>
+          <button
+            onClick={handleDeleteAllInstallments}
+            className="flex items-center justify-center gap-2 rounded-md bg-rose-600 px-3 py-2 text-sm font-medium text-white outline-none transition-colors hover:bg-rose-700 focus:ring-2 focus:ring-rose-500"
+          >
+            <Trash2 size={14} /> Excluir todas as parcelas desta compra
+          </button>
+        </div>
+      </Modal>
     </Modal>
   );
 }
@@ -710,6 +747,7 @@ export function CardsTab({
         onClose={() => setSelectedAccount(null)}
         onUpdate={onUpdateTransaction}
         onDelete={onDeleteTransaction}
+        onDeleteSeries={onDeleteSeries}
         bills={bills}
         onCloseFatura={onCloseFatura}
       />
