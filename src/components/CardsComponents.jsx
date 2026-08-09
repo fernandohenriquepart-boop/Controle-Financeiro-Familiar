@@ -789,9 +789,9 @@ function CardsMonthlyChart({ accounts, transactions }) {
   );
 }
 
-function CardsCategoryPieChart({ accounts, transactions, categories }) {
+function CardsCategoryPieChart({ accounts, transactions, categories, monthKey }) {
   const cardAccountIds = new Set(accounts.filter((a) => a.type === "cartao_credito").map((a) => a.id));
-  const monthTx = transactionsInMonth(transactions, currentMonthKey()).filter((t) => cardAccountIds.has(t.accountId));
+  const monthTx = transactionsInMonth(transactions, monthKey).filter((t) => cardAccountIds.has(t.accountId));
   const expenseByCategory = categoryTotals(monthTx, categories, "expense");
   const chartData = expenseByCategory.map((c) => ({
     name: c.category?.name ?? "Sem categoria",
@@ -800,9 +800,9 @@ function CardsCategoryPieChart({ accounts, transactions, categories }) {
 
   return (
     <Card>
-      <h3 className="mb-3 text-sm font-semibold text-slate-800">Gastos por categoria (cartões)</h3>
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">Gastos por categoria (cartões) — {formatMonthLabel(monthKey)}</h3>
       {chartData.length === 0 ? (
-        <EmptyState title="Sem gastos de cartão neste mês" />
+        <EmptyState title="Sem gastos de cartão nesse mês" />
       ) : (
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="h-48 w-full sm:w-1/2">
@@ -857,16 +857,20 @@ export function CardsTab({
   const [importOpen, setImportOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
+  const [managementMonthKey, setManagementMonthKey] = useState(currentMonthKey());
   const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
   const purchaseSeries = series.filter((s) => s.kind === "installment");
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3">
-        <h2 className="text-sm font-semibold text-slate-800">Visão gerencial dos cartões</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-800">Visão gerencial dos cartões</h2>
+          <MonthSwitcher monthKey={managementMonthKey} onChange={(delta) => setManagementMonthKey((m) => shiftMonthKey(m, delta))} />
+        </div>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <CardsMonthlyChart accounts={accounts} transactions={transactions} />
-          <CardsCategoryPieChart accounts={accounts} transactions={transactions} categories={categories} />
+          <CardsCategoryPieChart accounts={accounts} transactions={transactions} categories={categories} monthKey={managementMonthKey} />
         </div>
       </div>
 
