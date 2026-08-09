@@ -516,7 +516,7 @@ export function CardDetailModal({
   );
 }
 
-function PurchaseProgress({ series, account, transactions, onDelete }) {
+function PurchaseProgress({ series, account, transactions, onSelect, onDelete }) {
   const today = new Date().toISOString().slice(0, 10);
   const paid = transactions.filter((t) => t.seriesId === series.id && t.date <= today).length;
   return (
@@ -531,10 +531,76 @@ function PurchaseProgress({ series, account, transactions, onDelete }) {
           <ProgressBar pct={Math.round((paid / series.installmentCount) * 100)} />
         </div>
       </div>
-      <button onClick={() => onDelete(series.id)} className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
-        <Trash2 size={14} />
-      </button>
+      <div className="flex shrink-0 items-center gap-1">
+        <button onClick={() => onSelect(series)} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
+          <Pencil size={14} />
+        </button>
+        <button onClick={() => onDelete(series.id)} className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
+          <Trash2 size={14} />
+        </button>
+      </div>
     </li>
+  );
+}
+
+function SeriesTransactionsModal({ series, transactions, categories, accounts, isOpen, onClose, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(null);
+  const seriesTx = series ? transactions.filter((t) => t.seriesId === series.id).sort((a, b) => (a.date < b.date ? -1 : 1)) : [];
+
+  async function handleEditSubmit(form, _recurring, applyScope) {
+    const { __id, ...payload } = form;
+    await onUpdate(__id, payload, applyScope);
+  }
+
+  return (
+    <Modal title={series?.description || "Parcelas da compra"} isOpen={isOpen} onClose={onClose} wide>
+      <div className="flex flex-col gap-3">
+        {seriesTx.length === 0 ? (
+          <EmptyState title="Nenhuma parcela encontrada" />
+        ) : (
+          <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+            {seriesTx.map((t) => {
+              const category = categories.find((c) => c.id === t.categoryId);
+              return (
+                <li key={t.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-slate-800">{t.description || "Lançamento"}</p>
+                    <p className="text-xs text-slate-400">
+                      {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                      {category ? ` · ${category.name}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-medium text-rose-600">{formatCurrency(t.amount)}</span>
+                    <button
+                      onClick={() => setEditing(buildEditPayload(t))}
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => onDelete(t.id)}
+                      className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <TransactionModal
+        isOpen={!!editing}
+        onClose={() => setEditing(null)}
+        onSubmit={handleEditSubmit}
+        categories={categories}
+        accounts={accounts}
+        initial={editing}
+      />
+    </Modal>
   );
 }
 
@@ -652,6 +718,7 @@ export function CardsTab({
   const [cashModalOpen, setCashModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
+  const [selectedSeries, setSelectedSeries] = useState(null);
   const cardAccounts = accounts.filter((a) => a.type === "cartao_credito");
   const purchaseSeries = series.filter((s) => s.kind === "installment");
 
@@ -716,6 +783,7 @@ export function CardsTab({
                 series={s}
                 account={accounts.find((a) => a.id === s.accountId)}
                 transactions={transactions}
+                onSelect={setSelectedSeries}
                 onDelete={onDeleteSeries}
               />
             ))}
@@ -760,6 +828,17 @@ export function CardsTab({
         onDeleteSeries={onDeleteSeries}
         bills={bills}
         onCloseFatura={onCloseFatura}
+      />
+
+      <SeriesTransactionsModal
+        series={selectedSeries}
+        transactions={transactions}
+        categories={categories}
+        accounts={accounts}
+        isOpen={!!selectedSeries}
+        onClose={() => setSelectedSeries(null)}
+        onUpdate={onUpdateTransaction}
+        onDelete={onDeleteTransaction}
       />
     </div>
   );
