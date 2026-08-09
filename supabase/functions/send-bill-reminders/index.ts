@@ -52,6 +52,14 @@ Deno.serve(async (req) => {
     horizon.setDate(horizon.getDate() + REMINDER_HORIZON_DAYS);
     const horizonStr = horizon.toISOString().slice(0, 10);
 
+    // DEBUG temporário — remover depois de confirmar por que uma conta não entra no filtro.
+    const { data: debugAllPending } = await admin
+      .from("bills")
+      .select("id, description, status, due_date, reminder_sent_at")
+      .eq("status", "pending");
+    console.log("Reminder debug — today (UTC):", today.toISOString(), "| horizon:", horizonStr);
+    console.log("Reminder debug — todas as contas pendentes:", JSON.stringify(debugAllPending));
+
     // Contas pendentes vencendo até o horizonte (ou já vencidas) que ainda
     // não geraram um aviso — reminder_sent_at marca isso, pra não repetir
     // todo dia.
