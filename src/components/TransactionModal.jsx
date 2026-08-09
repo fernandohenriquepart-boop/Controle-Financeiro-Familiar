@@ -19,6 +19,9 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = Boolean(initial?.__id);
   const belongsToSeries = isEditing && Boolean(initial?.seriesId);
+  // Estorno de cartão é lançado com valor negativo (ver NewRefundModal) — ao
+  // editar um já existente, não pode barrar o valor negativo como se fosse erro.
+  const isEditingRefund = isEditing && Number(initial?.amount) < 0;
 
   useMemo(() => {
     if (isOpen) {
@@ -46,8 +49,8 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
-    if (!form.amount || Number(form.amount) <= 0) {
-      setError("Informe um valor maior que zero.");
+    if (!form.amount || (isEditingRefund ? Number(form.amount) === 0 : Number(form.amount) <= 0)) {
+      setError(isEditingRefund ? "Informe um valor diferente de zero." : "Informe um valor maior que zero.");
       return;
     }
     setIsSubmitting(true);
@@ -105,7 +108,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
           <input
             type="number"
             required
-            min="0.01"
+            min={isEditingRefund ? undefined : "0.01"}
             step="0.01"
             value={form.amount}
             onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
@@ -113,6 +116,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
             placeholder="0,00"
             autoFocus
           />
+          {isEditingRefund && <p className="text-[11px] text-slate-400">Estorno — mantenha o valor negativo.</p>}
         </Field>
 
         <Field label="Descrição">

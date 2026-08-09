@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, CreditCard, TrendingUp, Upload, Undo2 } from "lucide-react";
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Legend, CartesianGrid } from "recharts";
 import { Card, Modal, Field, EmptyState, Badge, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
 import { ImportFaturaModal } from "./ImportFaturaModal";
@@ -297,6 +297,137 @@ function NewCashPurchaseModal({ isOpen, onClose, onSubmit, cardAccounts, categor
   );
 }
 
+function NewRefundModal({ isOpen, onClose, onSubmit, cardAccounts, categories }) {
+  const [form, setForm] = useState(emptyCashForm(cardAccounts));
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useMemo(() => {
+    if (isOpen) setForm(emptyCashForm(cardAccounts));
+  }, [isOpen, cardAccounts]);
+
+  const expenseCategories = categories.filter((c) => c.type === "expense");
+  const account = cardAccounts.find((a) => a.id === form.accountId);
+  const billingDate =
+    account?.closingDay && account?.dueDay
+      ? billingDueDate(new Date(form.purchaseDate + "T00:00:00"), account.closingDay, account.dueDay)
+      : null;
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    if (!form.accountId) {
+      setError("Cadastre um cartão em Configurações primeiro.");
+      return;
+    }
+    if (!form.amount || Number(form.amount) <= 0) {
+      setError("Informe um valor maior que zero.");
+      return;
+    }
+    if (!billingDate) {
+      setError("Esse cartão está sem dia de fechamento/vencimento cadastrado.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        type: "expense",
+        accountId: form.accountId,
+        categoryId: form.categoryId,
+        description: form.description,
+        amount: -Math.abs(Number(form.amount)),
+        date: toDateInputValue(billingDate),
+      });
+      onClose();
+    } catch (err) {
+      setError(err.message || "Não foi possível salvar.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Modal title="Lançar estorno no cartão" isOpen={isOpen} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+        <Field label="Cartão">
+          <select
+            value={form.accountId}
+            onChange={(e) => setForm((f) => ({ ...f, accountId: e.target.value }))}
+            className={`${inputClass} w-full`}
+          >
+            {cardAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Descrição">
+          <input
+            type="text"
+            required
+            autoFocus
+            value={form.description}
+            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            className={`${inputClass} w-full`}
+            placeholder="Ex: Estorno compra cancelada"
+          />
+        </Field>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="Valor (R$)">
+            <input
+              type="number"
+              required
+              min="0.01"
+              step="0.01"
+              value={form.amount}
+              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+              className={`${inputClass} w-full`}
+            />
+          </Field>
+          <Field label="Data do estorno">
+            <input
+              type="date"
+              required
+              value={form.purchaseDate}
+              onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))}
+              className={`${inputClass} w-full`}
+            />
+          </Field>
+        </div>
+
+        <Field label="Categoria (opcional)">
+          <select
+            value={form.categoryId}
+            onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value }))}
+            className={`${inputClass} w-full`}
+          >
+            <option value="">Sem categoria</option>
+            {expenseCategories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {billingDate && (
+          <p className="text-xs text-slate-400">
+            Reduz a fatura de {billingDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+          </p>
+        )}
+
+        {error && <p className="text-xs text-rose-600">{error}</p>}
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClass}>
+          {isSubmitting ? "Salvando..." : "Lançar estorno"}
+        </button>
+      </form>
+    </Modal>
+  );
+}
+
 function CardSummary({ account, transactions, onSelect }) {
   const monthTx = transactionsInMonth(transactions, currentMonthKey()).filter((t) => t.accountId === account.id);
   const faturaAtual = sumByType(monthTx, "expense");
@@ -450,17 +581,23 @@ export function CardDetailModal({
           <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
             {monthTx.map((t) => {
               const category = categories.find((c) => c.id === t.categoryId);
+              const isRefund = t.amount < 0;
               return (
                 <li key={t.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-slate-800">{t.description || "Lançamento"}</p>
+                    <p className="truncate font-medium text-slate-800">
+                      {t.description || "Lançamento"}
+                      {isRefund && <span className="ml-1.5 text-[10px] font-normal text-emerald-600">estorno</span>}
+                    </p>
                     <p className="text-xs text-slate-400">
                       {new Date(t.date + "T00:00:00").toLocaleDateString("pt-BR")}
                       {category ? ` · ${category.name}` : ""}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="font-medium text-rose-600">{formatCurrency(t.amount)}</span>
+                    <span className={`font-medium ${isRefund ? "text-emerald-600" : "text-rose-600"}`}>
+                      {formatCurrency(Math.abs(t.amount))}
+                    </span>
                     {canEdit && (
                       <>
                         <button
@@ -716,6 +853,7 @@ export function CardsTab({
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [cashModalOpen, setCashModalOpen] = useState(false);
+  const [refundModalOpen, setRefundModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [selectedSeries, setSelectedSeries] = useState(null);
@@ -746,6 +884,13 @@ export function CardsTab({
           className={secondaryButtonClass + " disabled:opacity-60"}
         >
           <Plus size={13} /> Compra à vista
+        </button>
+        <button
+          onClick={() => setRefundModalOpen(true)}
+          disabled={cardAccounts.length === 0}
+          className={secondaryButtonClass + " disabled:opacity-60"}
+        >
+          <Undo2 size={13} /> Lançar estorno
         </button>
         <button
           onClick={() => setModalOpen(true)}
@@ -802,6 +947,14 @@ export function CardsTab({
       <NewCashPurchaseModal
         isOpen={cashModalOpen}
         onClose={() => setCashModalOpen(false)}
+        onSubmit={onCreateCashExpense}
+        cardAccounts={cardAccounts}
+        categories={categories}
+      />
+
+      <NewRefundModal
+        isOpen={refundModalOpen}
+        onClose={() => setRefundModalOpen(false)}
         onSubmit={onCreateCashExpense}
         cardAccounts={cardAccounts}
         categories={categories}

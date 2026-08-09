@@ -304,15 +304,16 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
             {monthTx.slice(0, 8).map((t) => {
               const category = categories.find((c) => c.id === t.categoryId);
               const preset = colorPreset(category?.colorId);
+              const impact = t.type === "income" ? t.amount : -t.amount;
               return (
                 <li key={t.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className={`h-2 w-2 shrink-0 rounded-full ${preset.dot}`} />
                     <span className="truncate text-slate-700">{t.description || category?.name || "Lançamento"}</span>
                   </span>
-                  <span className={`shrink-0 font-medium ${t.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
-                    {t.type === "income" ? "+" : "-"}
-                    {formatCurrency(t.amount)}
+                  <span className={`shrink-0 font-medium ${impact >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+                    {impact >= 0 ? "+" : "-"}
+                    {formatCurrency(Math.abs(impact))}
                   </span>
                 </li>
               );
