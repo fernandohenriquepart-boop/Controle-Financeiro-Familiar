@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Scale, AlertTriangle, Pencil, Trash2, CreditCard } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Legend, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Modal, EmptyState, Badge } from "./ui";
 import { TransactionModal } from "./TransactionModal";
 import {
@@ -13,6 +13,7 @@ import {
   upcomingBills,
   isOverdue,
   buildEditPayload,
+  shiftMonthKey,
 } from "../domain";
 
 const CHART_COLORS = ["#059669", "#0d9488", "#2563eb", "#7c3aed", "#db2777", "#ea580c", "#d97706", "#64748b"];
@@ -130,6 +131,35 @@ function MonthExpensesModal({ isOpen, onClose, transactions, cardTotals, categor
         initial={editing}
       />
     </Modal>
+  );
+}
+
+function AnnualOverviewChart({ transactions, monthKey }) {
+  const months = Array.from({ length: 12 }, (_, i) => shiftMonthKey(monthKey, i - 11));
+  const data = months.map((mk) => {
+    const monthTx = transactionsInMonth(transactions, mk);
+    const income = sumByType(monthTx, "income");
+    const expense = monthTx.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+    return { month: formatMonthLabel(mk).slice(0, 3), Receitas: income, Despesas: expense };
+  });
+
+  return (
+    <Card>
+      <h3 className="mb-3 text-sm font-semibold text-slate-800">Receita x despesa — últimos 12 meses</h3>
+      <div className="h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+            <Tooltip formatter={(v) => formatCurrency(v)} />
+            <Legend wrapperStyle={{ fontSize: 11 }} />
+            <Bar dataKey="Receitas" fill="#2563eb" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Despesas" fill="#e11d48" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   );
 }
 
@@ -290,6 +320,8 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           </ul>
         )}
       </Card>
+
+      <AnnualOverviewChart transactions={transactions} monthKey={monthKey} />
 
       <MonthExpensesModal
         isOpen={expensesModalOpen}

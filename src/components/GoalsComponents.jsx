@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, Target, PiggyBank } from "lucide-react";
 import { Card, Modal, Field, EmptyState, inputClass, primaryButtonClass, secondaryButtonClass, ProgressBar } from "./ui";
-import { formatCurrency, goalProgress, colorPreset, COLOR_PRESETS } from "../domain";
+import { formatCurrency, goalProgress, colorPreset, COLOR_PRESETS, accountBalance } from "../domain";
 
 function emptyForm() {
-  return { name: "", targetAmount: "", currentAmount: "0", targetDate: "", colorId: "emerald" };
+  return { name: "", targetAmount: "", currentAmount: "0", targetDate: "", colorId: "emerald", accountId: "" };
 }
 
-function GoalModal({ isOpen, onClose, onSubmit, initial }) {
+function GoalModal({ isOpen, onClose, onSubmit, initial, accounts }) {
   const [form, setForm] = useState(initial ?? emptyForm());
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,17 +69,39 @@ function GoalModal({ isOpen, onClose, onSubmit, initial }) {
               className={`${inputClass} w-full`}
             />
           </Field>
-          <Field label="Já guardado (R$)">
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              value={form.currentAmount}
-              onChange={(e) => setForm((f) => ({ ...f, currentAmount: e.target.value }))}
-              className={`${inputClass} w-full`}
-            />
-          </Field>
+          {!form.accountId && (
+            <Field label="Já guardado (R$)">
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.currentAmount}
+                onChange={(e) => setForm((f) => ({ ...f, currentAmount: e.target.value }))}
+                className={`${inputClass} w-full`}
+              />
+            </Field>
+          )}
         </div>
+
+        <Field label="Conta vinculada (opcional)">
+          <select
+            value={form.accountId}
+            onChange={(e) => setForm((f) => ({ ...f, accountId: e.target.value }))}
+            className={`${inputClass} w-full`}
+          >
+            <option value="">Nenhuma — controlar valor à mão</option>
+            {accounts
+              .filter((a) => a.type !== "cartao_credito")
+              .map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+          </select>
+          {form.accountId && (
+            <p className="text-[11px] text-slate-400">O progresso passa a ser o saldo real dessa conta, atualizado sozinho.</p>
+          )}
+        </Field>
 
         <Field label="Data alvo (opcional)">
           <input
@@ -164,7 +186,7 @@ function AddContributionModal({ isOpen, onClose, onSubmit, goal }) {
   );
 }
 
-export function GoalsTab({ goals, onCreate, onUpdate, onDelete }) {
+export function GoalsTab({ goals, accounts, transactions, onCreate, onUpdate, onDelete }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [contributingGoal, setContributingGoal] = useState(null);
@@ -181,6 +203,7 @@ export function GoalsTab({ goals, onCreate, onUpdate, onDelete }) {
       currentAmount: String(goal.currentAmount),
       targetDate: goal.targetDate ?? "",
       colorId: goal.colorId,
+      accountId: goal.accountId ?? "",
       __id: goal.id,
     });
     setModalOpen(true);
@@ -211,7 +234,11 @@ export function GoalsTab({ goals, onCreate, onUpdate, onDelete }) {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {goals.map((goal) => {
             const preset = colorPreset(goal.colorId);
-            const pct = goalProgress(goal);
+            const linkedAccount = goal.accountId ? accounts.find((a) => a.id === goal.accountId) : null;
+            const effectiveGoal = linkedAccount
+              ? { ...goal, currentAmount: accountBalance(linkedAccount, transactions) }
+              : goal;
+            const pct = goalProgress(effectiveGoal);
             return (
               <Card key={goal.id} className="flex flex-col gap-3">
                 <div className="flex items-start justify-between gap-2">
@@ -240,19 +267,22 @@ export function GoalsTab({ goals, onCreate, onUpdate, onDelete }) {
 
                 <ProgressBar pct={pct} barClassName={preset.bar} />
                 <p className="text-xs text-slate-500">
-                  {formatCurrency(goal.currentAmount)} de {formatCurrency(goal.targetAmount)} ({pct}%)
+                  {formatCurrency(effectiveGoal.currentAmount)} de {formatCurrency(goal.targetAmount)} ({pct}%)
+                  {linkedAccount && ` · saldo de ${linkedAccount.name}`}
                 </p>
 
-                <button onClick={() => setContributingGoal(goal)} className={secondaryButtonClass + " justify-center"}>
-                  <PiggyBank size={13} /> Adicionar aporte
-                </button>
+                {!linkedAccount && (
+                  <button onClick={() => setContributingGoal(goal)} className={secondaryButtonClass + " justify-center"}>
+                    <PiggyBank size={13} /> Adicionar aporte
+                  </button>
+                )}
               </Card>
             );
           })}
         </div>
       )}
 
-      <GoalModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleSubmit} initial={editing} />
+      <GoalModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleSubmit} initial={editing} accounts={accounts} />
       <AddContributionModal
         isOpen={!!contributingGoal}
         onClose={() => setContributingGoal(null)}

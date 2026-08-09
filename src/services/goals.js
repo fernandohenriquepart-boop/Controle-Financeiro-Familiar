@@ -8,6 +8,7 @@ function mapFromDb(row) {
     currentAmount: Number(row.current_amount),
     targetDate: row.target_date ?? undefined,
     colorId: row.color_id,
+    accountId: row.account_id ?? undefined,
     createdAt: row.created_at,
   };
 }
@@ -21,6 +22,7 @@ function mapToDb(goal, householdId) {
     current_amount: goal.currentAmount ?? 0,
     target_date: goal.targetDate || null,
     color_id: goal.colorId ?? "emerald",
+    account_id: goal.accountId || null,
   };
 }
 
@@ -47,6 +49,7 @@ export async function updateGoal(id, changes) {
   if ("currentAmount" in changes) row.current_amount = changes.currentAmount;
   if ("targetDate" in changes) row.target_date = changes.targetDate || null;
   if ("colorId" in changes) row.color_id = changes.colorId;
+  if ("accountId" in changes) row.account_id = changes.accountId || null;
   const { error } = await supabase.from("goals").update(row).eq("id", id);
   if (error) throw error;
 }

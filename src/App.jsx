@@ -521,7 +521,14 @@ export default function App() {
               onMarkPaid={markBillPaid}
             />
           ) : tab === "goals" ? (
-            <GoalsTab goals={goals} onCreate={createGoal} onUpdate={editGoal} onDelete={removeGoal} />
+            <GoalsTab
+              goals={goals}
+              accounts={accounts}
+              transactions={transactions}
+              onCreate={createGoal}
+              onUpdate={editGoal}
+              onDelete={removeGoal}
+            />
           ) : (
             <SettingsTab
               household={household}
