@@ -31,11 +31,17 @@ function groupTransactionsByCategory(txs, categories) {
     .sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
 }
 
-function CategoryGroupsCard({ title, groups, onSelect }) {
+function CategoryGroupsCard({ title, groups, expenseTotal, onSelect }) {
   if (groups.length === 0) return null;
   return (
     <Card>
-      <h3 className="mb-2 text-sm font-semibold text-slate-800">{title}</h3>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+        <div className="rounded-lg bg-rose-50 px-3 py-1.5 text-right">
+          <p className="text-[10px] uppercase tracking-wide text-rose-500">Total</p>
+          <p className="text-sm font-semibold text-rose-700">{formatCurrency(expenseTotal)}</p>
+        </div>
+      </div>
       <ul className="divide-y divide-slate-100">
         {groups.map(({ key, category, txs, total }) => {
           const preset = colorPreset(category?.colorId);
@@ -278,11 +284,14 @@ export function TransactionsTab({
     .filter((a) => cardAccountIds.has(a.id))
     .map((a) => ({ account: a, total: sumByType(monthTx.filter((t) => t.accountId === a.id), "expense") }))
     .filter((g) => g.total > 0);
+  const cardExpenseTotal = cardGroups.reduce((sum, g) => sum + g.total, 0);
 
   const fixedTx = otherTx.filter((t) => t.isFixed);
   const variableTx = otherTx.filter((t) => !t.isFixed);
   const fixedCategoryGroups = groupTransactionsByCategory(fixedTx, categories);
   const variableCategoryGroups = groupTransactionsByCategory(variableTx, categories);
+  const fixedExpenseTotal = sumByType(fixedTx, "expense");
+  const variableExpenseTotal = sumByType(variableTx, "expense");
   const selectedCategoryGroup = selectedGroup
     ? (selectedGroup.kind === "fixed" ? fixedCategoryGroups : variableCategoryGroups).find((g) => g.key === selectedGroup.key) ?? null
     : null;
@@ -335,7 +344,13 @@ export function TransactionsTab({
 
       {cardGroups.length > 0 && (
         <Card>
-          <h3 className="mb-2 text-sm font-semibold text-slate-800">Cartões</h3>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-slate-800">Cartões</h3>
+            <div className="rounded-lg bg-rose-50 px-3 py-1.5 text-right">
+              <p className="text-[10px] uppercase tracking-wide text-rose-500">Total</p>
+              <p className="text-sm font-semibold text-rose-700">{formatCurrency(cardExpenseTotal)}</p>
+            </div>
+          </div>
           <ul className="divide-y divide-slate-100">
             {cardGroups.map(({ account, total }) => (
               <li key={account.id}>
@@ -377,11 +392,13 @@ export function TransactionsTab({
           <CategoryGroupsCard
             title="Despesa Fixa"
             groups={fixedCategoryGroups}
+            expenseTotal={fixedExpenseTotal}
             onSelect={(key) => setSelectedGroup({ kind: "fixed", key })}
           />
           <CategoryGroupsCard
             title="Despesa Variável"
             groups={variableCategoryGroups}
+            expenseTotal={variableExpenseTotal}
             onSelect={(key) => setSelectedGroup({ kind: "variable", key })}
           />
         </>
