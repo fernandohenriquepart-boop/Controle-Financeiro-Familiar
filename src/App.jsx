@@ -166,10 +166,29 @@ export default function App() {
       flashSyncError(err);
     }
   }
-  async function editTransaction(id, changes) {
+  async function editTransaction(id, changes, applyScope) {
     try {
-      await transactionsApi.updateTransaction(id, changes);
-      setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+      if (applyScope === "future") {
+        const original = transactions.find((t) => t.id === id);
+        const { date: _date, seriesId: _seriesId, ...forwardChanges } = changes;
+        const futureIds = original?.seriesId
+          ? transactions
+              .filter((t) => t.seriesId === original.seriesId && t.id !== id && t.date >= original.date)
+              .map((t) => t.id)
+          : [];
+        await transactionsApi.updateTransaction(id, changes);
+        await transactionsApi.updateTransactionsBulk(futureIds, forwardChanges);
+        setTransactions((prev) =>
+          prev.map((t) => {
+            if (t.id === id) return { ...t, ...changes };
+            if (futureIds.includes(t.id)) return { ...t, ...forwardChanges };
+            return t;
+          })
+        );
+      } else {
+        await transactionsApi.updateTransaction(id, changes);
+        setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...changes } : t)));
+      }
     } catch (err) {
       flashSyncError(err);
     }

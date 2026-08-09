@@ -358,9 +358,9 @@ export function CardDetailModal({
   const canCloseFatura = Boolean(onCloseFatura && bills);
   const closedBill = bills?.find((b) => b.accountId === account.id && b.dueDate?.slice(0, 7) === monthKey.slice(0, 7));
 
-  async function handleEditSubmit(form) {
+  async function handleEditSubmit(form, _recurring, applyScope) {
     const { __id, ...payload } = form;
-    await onUpdate(__id, payload);
+    await onUpdate(__id, payload, applyScope);
   }
 
   async function handleCloseFatura() {

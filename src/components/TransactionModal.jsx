@@ -14,9 +14,11 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
   const [repeats, setRepeats] = useState(false);
   const [repeatMonths, setRepeatMonths] = useState("");
   const [isFixed, setIsFixed] = useState(initial?.isFixed ?? false);
+  const [applyScope, setApplyScope] = useState("single"); // "single" | "future" — só relevante editando lançamento de série
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isEditing = Boolean(initial?.__id);
+  const belongsToSeries = isEditing && Boolean(initial?.seriesId);
 
   useMemo(() => {
     if (isOpen) {
@@ -24,6 +26,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
       setRepeats(false);
       setRepeatMonths("");
       setIsFixed(initial?.isFixed ?? false);
+      setApplyScope("single");
     }
   }, [isOpen, initial]);
 
@@ -51,7 +54,7 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
     try {
       const recurring = !isEditing && repeats ? { months: repeatMonths ? Number(repeatMonths) : null } : null;
       const date = cardBillingDate ? toDateInputValue(cardBillingDate) : form.date;
-      await onSubmit({ ...form, amount: Number(form.amount), date, isFixed }, recurring);
+      await onSubmit({ ...form, amount: Number(form.amount), date, isFixed }, recurring, belongsToSeries ? applyScope : undefined);
       onClose();
     } catch (err) {
       setError(err.message || "Não foi possível salvar.");
@@ -177,6 +180,29 @@ export function TransactionModal({ isOpen, onClose, onSubmit, categories, accoun
           />
           Despesa fixa (aluguel, assinatura...)
         </label>
+
+        {belongsToSeries && (
+          <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">
+            <p className="text-xs font-medium text-slate-600">Aplicar alteração a:</p>
+            <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm">
+              {[
+                { id: "single", label: "Somente este" },
+                { id: "future", label: "Este e os próximos" },
+              ].map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setApplyScope(opt.id)}
+                  className={`flex-1 rounded-md px-3 py-1.5 font-medium ${
+                    applyScope === opt.id ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {!isEditing && (
           <div className="flex flex-col gap-2 rounded-lg border border-slate-200 p-3">

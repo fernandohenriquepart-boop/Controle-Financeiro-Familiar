@@ -64,7 +64,7 @@ export async function insertTransactionsBulk(transactions, householdId) {
   return data.map(mapFromDb);
 }
 
-export async function updateTransaction(id, changes) {
+function changesToRow(changes) {
   const row = {};
   if ("accountId" in changes) row.account_id = changes.accountId || null;
   if ("categoryId" in changes) row.category_id = changes.categoryId || null;
@@ -75,7 +75,18 @@ export async function updateTransaction(id, changes) {
   if ("isRecurring" in changes) row.is_recurring = changes.isRecurring;
   if ("recurrenceRule" in changes) row.recurrence_rule = changes.recurrenceRule || null;
   if ("isFixed" in changes) row.is_fixed = changes.isFixed;
-  const { error } = await supabase.from("transactions").update(row).eq("id", id);
+  return row;
+}
+
+export async function updateTransaction(id, changes) {
+  const { error } = await supabase.from("transactions").update(changesToRow(changes)).eq("id", id);
+  if (error) throw error;
+}
+
+/** Aplica as mesmas mudanças a várias transações de uma vez (ex: "esta e as próximas" de uma série). */
+export async function updateTransactionsBulk(ids, changes) {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from("transactions").update(changesToRow(changes)).in("id", ids);
   if (error) throw error;
 }
 

@@ -84,6 +84,7 @@ export function buildEditPayload(transaction) {
     categoryId: transaction.categoryId ?? "",
     accountId: transaction.accountId ?? "",
     isFixed: transaction.isFixed ?? false,
+    seriesId: transaction.seriesId,
     __id: transaction.id,
   };
 }

@@ -99,9 +99,9 @@ function CategoryDetailModal({
     (b) => b.type === "payable" && (b.categoryId ?? "") === (category?.id ?? "") && b.dueDate?.slice(0, 7) === monthKey?.slice(0, 7)
   );
 
-  async function handleEditSubmit(form) {
+  async function handleEditSubmit(form, _recurring, applyScope) {
     const { __id, ...payload } = form;
-    await onUpdate(__id, payload);
+    await onUpdate(__id, payload, applyScope);
   }
 
   function openBillDraft() {
@@ -291,10 +291,10 @@ export function TransactionsTab({
     setModalOpen(true);
   }
 
-  async function handleSubmit(form, recurring) {
+  async function handleSubmit(form, recurring, applyScope) {
     const { __id, __new, ...payload } = form;
     if (__id) {
-      await onUpdate(__id, payload);
+      await onUpdate(__id, payload, applyScope);
     } else if (recurring) {
       await onCreateRecurring(payload, recurring.months);
     } else {
