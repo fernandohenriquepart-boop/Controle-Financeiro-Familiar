@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserPlus, Check, Copy } from "lucide-react";
 import { Card, Modal, Field, EmptyState, Avatar, Badge, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
 import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset, formatCurrency } from "../domain";
 import { findDuplicateGroups } from "../lib/duplicates";
+import { isPushSupported, getExistingSubscription, subscribeToPush, unsubscribeFromPush } from "../services/push";
 
 // --- Nome da família -------------------------------------------------------
 
@@ -66,6 +67,69 @@ function HouseholdNameCard({ household, isAdmin, onUpdateName }) {
           {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? "Copiado" : "Copiar"}
         </button>
       </div>
+    </Card>
+  );
+}
+
+// --- Lembretes de vencimento (push) ---------------------------------------
+
+function PushRemindersCard({ household, profile }) {
+  const [supported] = useState(() => isPushSupported());
+  const [subscribed, setSubscribed] = useState(false);
+  const [checking, setChecking] = useState(true);
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!supported) {
+      setChecking(false);
+      return;
+    }
+    getExistingSubscription()
+      .then((sub) => setSubscribed(Boolean(sub)))
+      .finally(() => setChecking(false));
+  }, [supported]);
+
+  async function handleToggle() {
+    setError("");
+    setIsSubmitting(true);
+    try {
+      if (subscribed) {
+        await unsubscribeFromPush();
+        setSubscribed(false);
+      } else {
+        await subscribeToPush(household.id, profile.id);
+        setSubscribed(true);
+      }
+    } catch (err) {
+      setError(err.message || "Não foi possível concluir.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Card className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-slate-800">Lembretes de vencimento</p>
+        <p className="text-xs text-slate-400">
+          {!supported
+            ? "Este navegador/aparelho não suporta notificações push."
+            : subscribed
+              ? "Ativado neste aparelho — avisa quando uma conta estiver perto de vencer."
+              : "Receba um aviso quando uma conta estiver perto de vencer, mesmo com o app fechado."}
+        </p>
+        {error && <p className="mt-1 text-xs text-rose-600">{error}</p>}
+      </div>
+      {supported && !checking && (
+        <button
+          onClick={handleToggle}
+          disabled={isSubmitting}
+          className={subscribed ? secondaryButtonClass : primaryButtonClass + " !px-3 !py-1.5 text-xs"}
+        >
+          {isSubmitting ? "Aguarde..." : subscribed ? "Desativar" : "Ativar"}
+        </button>
+      )}
     </Card>
   );
 }
@@ -556,6 +620,7 @@ export function SettingsTab({
   return (
     <div className="flex flex-col gap-4">
       <HouseholdNameCard household={household} isAdmin={isAdmin} onUpdateName={onUpdateHouseholdName} />
+      <PushRemindersCard household={household} profile={profile} />
       <MembersCard members={members} isAdmin={isAdmin} onInvite={onInvite} />
       <CategoriesCard categories={categories} onCreate={onCreateCategory} onUpdate={onUpdateCategory} onDelete={onDeleteCategory} />
       <AccountsCard accounts={accounts} onCreate={onCreateAccount} onUpdate={onUpdateAccount} onDelete={onDeleteAccount} />
