@@ -31,6 +31,18 @@ Deno.serve(async (req) => {
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY")!;
     const vapidSubject = Deno.env.get("VAPID_SUBJECT") ?? "mailto:contato@example.com";
 
+    // DEBUG temporário — remover depois de confirmar o tamanho das chaves.
+    console.log(
+      "VAPID debug — public length:",
+      vapidPublicKey?.length,
+      "public preview:",
+      JSON.stringify(vapidPublicKey?.slice(0, 6) + "..." + vapidPublicKey?.slice(-6)),
+      "| private length:",
+      vapidPrivateKey?.length,
+      "private preview:",
+      JSON.stringify(vapidPrivateKey?.slice(0, 6) + "..." + vapidPrivateKey?.slice(-6))
+    );
+
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
 
     const admin = createClient(supabaseUrl, serviceRoleKey);
