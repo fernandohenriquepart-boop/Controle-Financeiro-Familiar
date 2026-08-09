@@ -295,6 +295,8 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
         </Card>
       </div>
 
+      <AnnualOverviewChart transactions={transactions} monthKey={monthKey} />
+
       <Card>
         <h3 className="mb-3 text-sm font-semibold text-slate-800">Últimos lançamentos</h3>
         {monthTx.length === 0 ? (
@@ -321,8 +323,6 @@ export function DashboardTab({ accounts, transactions, categories, bills, monthK
           </ul>
         )}
       </Card>
-
-      <AnnualOverviewChart transactions={transactions} monthKey={monthKey} />
 
       <MonthExpensesModal
         isOpen={expensesModalOpen}
