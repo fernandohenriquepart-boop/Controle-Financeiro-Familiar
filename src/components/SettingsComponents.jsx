@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Trash2, UserPlus, Check, Copy } from "lucide-react";
 import { Card, Modal, Field, EmptyState, Avatar, Badge, inputClass, primaryButtonClass, secondaryButtonClass } from "./ui";
-import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset } from "../domain";
+import { ACCOUNT_TYPE_LABELS, COLOR_PRESETS, colorPreset, formatCurrency } from "../domain";
+import { findDuplicateGroups } from "../lib/duplicates";
 
 // --- Nome da família -------------------------------------------------------
 
@@ -485,12 +486,63 @@ function AccountsCard({ accounts, onCreate, onUpdate, onDelete }) {
   );
 }
 
+// --- Duplicatas ----------------------------------------------------------
+
+function DuplicatesCard({ transactions, categories, accounts, onDelete }) {
+  const groups = useMemo(() => findDuplicateGroups(transactions), [transactions]);
+
+  return (
+    <Card>
+      <h3 className="mb-1 text-sm font-semibold text-slate-800">Possíveis duplicatas</h3>
+      <p className="mb-3 text-xs text-slate-400">
+        Lançamentos com mesmo tipo, conta, data e valor — confira e apague as cópias que não deviam estar aqui.
+      </p>
+      {groups.length === 0 ? (
+        <EmptyState title="Nenhuma duplicata encontrada" />
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {groups.map((group, i) => {
+            const first = group[0];
+            const category = categories.find((c) => c.id === first.categoryId);
+            const account = accounts.find((a) => a.id === first.accountId);
+            return (
+              <li key={i} className="rounded-lg border border-amber-200 bg-amber-50/60 p-2.5">
+                <p className="mb-1.5 text-xs font-medium text-amber-700">
+                  {group.length} lançamentos iguais · {new Date(first.date + "T00:00:00").toLocaleDateString("pt-BR")} ·{" "}
+                  {formatCurrency(first.amount)}
+                  {account ? ` · ${account.name}` : ""}
+                  {category ? ` · ${category.name}` : ""}
+                </p>
+                <ul className="divide-y divide-amber-100">
+                  {group.map((t) => (
+                    <li key={t.id} className="flex items-center justify-between gap-2 py-1.5 text-sm">
+                      <span className="min-w-0 truncate text-slate-700">{t.description || "Sem descrição"}</span>
+                      <button
+                        onClick={() => onDelete(t.id)}
+                        className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+}
+
 export function SettingsTab({
   household,
   profile,
   members,
   categories,
   accounts,
+  transactions,
+  onDeleteTransaction,
   onUpdateHouseholdName,
   onInvite,
   onCreateCategory,
@@ -507,6 +559,7 @@ export function SettingsTab({
       <MembersCard members={members} isAdmin={isAdmin} onInvite={onInvite} />
       <CategoriesCard categories={categories} onCreate={onCreateCategory} onUpdate={onUpdateCategory} onDelete={onDeleteCategory} />
       <AccountsCard accounts={accounts} onCreate={onCreateAccount} onUpdate={onUpdateAccount} onDelete={onDeleteAccount} />
+      <DuplicatesCard transactions={transactions} categories={categories} accounts={accounts} onDelete={onDeleteTransaction} />
     </div>
   );
 }

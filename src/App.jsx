@@ -510,6 +510,8 @@ export default function App() {
               members={members}
               categories={categories}
               accounts={accounts}
+              transactions={transactions}
+              onDeleteTransaction={removeTransaction}
               onUpdateHouseholdName={updateHouseholdName}
               onInvite={inviteMember}
               onCreateCategory={createCategory}
